@@ -1,0 +1,13 @@
+# Backend
+backend/im-chat
+backend/config.yaml
+backend/uploads/
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.DS_Store
+# System
+.DS_Store
+.idea/
+.vscode/
+*.log
