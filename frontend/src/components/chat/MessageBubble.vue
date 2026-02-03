@@ -1,65 +1,65 @@
 <template>
-  <div :class="['flex mb-6 w-full', isSelf ? 'justify-end' : 'justify-start']">
+  <div :class="['flex w-full relative group', isLastInGroup ? 'mb-6' : 'mb-1', isSelf ? 'justify-end' : 'justify-start']">
     
     <!-- Receiver Avatar (Left) -->
-    <div v-if="!isSelf" class="flex-shrink-0 mr-4">
-       <img :src="avatar" class="w-10 h-10 rounded-full object-cover shadow-sm bg-gray-200" />
+    <div v-if="!isSelf" :class="['flex-shrink-0 mr-2 flex flex-col justify-start', isFirstInGroup ? 'opacity-100' : 'invisible']">
+       <img :src="avatar" class="w-8 h-8 rounded-full object-cover shadow-sm bg-gray-200" />
     </div>
 
-    <div :class="['flex flex-col', isSelf ? 'items-end' : 'items-start']" style="max-w: 65%;">
+    <!-- Message Content Column -->
+    <div :class="['flex flex-col', isSelf ? 'items-end' : 'items-start', isFirstInGroup ? 'mt-6' : '']" style="max-width: 70%;">
        
-       <!-- Header Info -->
-       <div class="flex items-center mb-1 text-xs">
-          <template v-if="!isSelf">
-             <span class="font-bold text-gray-800 dark:text-gray-200 mr-2 text-sm">{{ username }}</span>
-             <span class="text-gray-400 dark:text-gray-400">{{ formatTime(msg.CreatedAt || msg.created_at) }}</span>
-          </template>
-          <template v-else>
-             <span class="text-gray-400 dark:text-gray-400 mr-2">{{ formatTime(msg.CreatedAt || msg.created_at) }}</span>
-             <span class="font-bold text-gray-800 dark:text-gray-200 mr-2 text-sm">You</span>
-          </template>
+       <!-- Bubble Container -->
+       <div class="relative">
+           <!-- The Bubble -->
+           <div :class="[
+             'px-4 py-2 shadow-sm relative leading-relaxed transition-all duration-200 break-words text-[15px]',
+             textSizeClass,
+             isSelf 
+               ? 'bg-amber-500 text-white rounded-3xl' 
+               : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-100 rounded-3xl border border-gray-100 dark:border-gray-600',
+             // Corner logic: TOP corners on FIRST message
+             isSelf && isFirstInGroup ? 'rounded-tr-sm' : '', // Self first: sharp top-right
+             !isSelf && isFirstInGroup ? 'rounded-tl-sm' : '' // Other first: sharp top-left
+           ]">
+              <!-- Image Content -->
+              <div v-if="msg.type === 'image'" class="-m-2">
+                <img :src="msg.mediaUrl" class="rounded-xl max-w-full cursor-pointer hover:opacity-95 transition block" />
+              </div>
+              <!-- Text Content -->
+              <div v-else class="whitespace-pre-wrap">
+                {{ msg.content }}
+              </div>
+           </div>
        </div>
 
-       <!-- Bubble -->
-       <div :class="[
-         'p-4 shadow-sm rounded-2xl relative leading-relaxed transition-all duration-200',
-         textSizeClass,
-         isSelf 
-           ? 'bg-amber-600 text-white rounded-tr-none' 
-           : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-100 rounded-tl-none border border-gray-100 dark:border-gray-600'
-       ]">
-          <!-- Image Content -->
-          <div v-if="msg.type === 'image'" class="-m-2">
-            <img :src="msg.mediaUrl" class="rounded-xl max-w-full cursor-pointer hover:opacity-95 transition block" />
-          </div>
-          <!-- Text Content -->
-          <div v-else>
-            {{ msg.content }}
-          </div>
+       <!-- Footer Info (Status) -->
+       <div v-if="isSelf && showStatus && isLastInGroup" class="mt-1 mr-3 text-[10px] font-medium text-gray-400">
+           {{ msg.isRead ? 'Read' : 'Delivered' }}
        </div>
-
-       <!-- Footer Info (Optional, like links or attachments preview) -->
     </div>
 
     <!-- Sender Avatar (Right) -->
-    <div v-if="isSelf" class="flex-shrink-0 ml-4">
-       <img :src="avatar" class="w-10 h-10 rounded-full object-cover shadow-sm bg-gray-200" />
+    <div v-if="isSelf" :class="['flex-shrink-0 ml-2 flex flex-col justify-start', isFirstInGroup ? 'opacity-100' : 'invisible']">
+       <img :src="avatar" class="w-8 h-8 rounded-full object-cover shadow-sm bg-gray-200" />
     </div>
-
+    
   </div>
 </template>
 
 
 <script setup lang="ts">
-import { defineProps, computed } from 'vue'
+import { computed } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
-import { formatTime } from '../../utils/date'
 
 const props = defineProps<{
     msg: any
     isSelf: boolean
     avatar: string
-    username?: string // Added username prop
+    username?: string
+    showStatus?: boolean
+    isFirstInGroup?: boolean // New computed prop
+    isLastInGroup?: boolean // New computed prop
 }>()
 
 const settingsStore = useSettingsStore()

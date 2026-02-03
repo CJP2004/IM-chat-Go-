@@ -4,6 +4,7 @@ import (
 	"im-chat/internal/models" // Import models
 	"im-chat/internal/service"
 	"im-chat/pkg/response" // Import response package
+	"im-chat/pkg/utils"    // Import utils for device parsing
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -52,6 +53,12 @@ func Login(c *gin.Context) {
 		response.Error(c, http.StatusUnauthorized, err.Error())
 		return
 	}
+
+	// 解析设备信息并更新 Tagline
+	uaString := c.GetHeader("User-Agent")
+	deviceName := utils.ParseDevice(uaString)
+	user.Tagline = deviceName
+	models.DB.Save(&user)
 
 	response.Success(c, gin.H{
 		"token": token,

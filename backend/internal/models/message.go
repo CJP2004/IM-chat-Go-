@@ -14,6 +14,7 @@ type Message struct {
 	Content    string `gorm:"type:text"`              // 消息内容
 	Type       string `gorm:"size:20;default:'text'"` // 消息类型: text, image
 	MediaURL   string `gorm:"size:255"`               // 媒体文件地址 (如果是图片消息)
+	IsRead     bool   `gorm:"default:false"`          // 是否已读
 }
 
 // CreateMessage 保存消息到数据库
