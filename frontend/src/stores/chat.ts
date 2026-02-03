@@ -9,6 +9,7 @@ interface Message {
   type?: string
   mediaUrl?: string
   CreatedAt?: string
+  isRead?: boolean
 }
 
 interface User {
@@ -65,7 +66,8 @@ export const useChatStore = defineStore('chat', {
             receiverId: m.ReceiverID,
             type: m.Type,
             mediaUrl: m.MediaURL,
-            CreatedAt: m.CreatedAt
+            CreatedAt: m.CreatedAt,
+            isRead: m.IsRead
         }))
       } catch (e) {
           console.error("Failed to fetch history", e)
@@ -96,6 +98,21 @@ export const useChatStore = defineStore('chat', {
       this.socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data)
+          const userStore = useUserStore()
+
+          // 处理已读回执
+          if (data.type === 'read_ack') {
+              // 如果收到的回执来自当前聊天对象，说明他读了我的消息
+              if (data.senderId === this.activeReceiverId) {
+                  this.messages.forEach(m => {
+                      if (m.senderId === userStore.user?.id) {
+                          m.isRead = true
+                      }
+                  })
+              }
+              return
+          }
+
           // 如果接收到的消息是发给当前聊天对象的，或者是当前聊天对象发来的
           if ((data.senderId === this.activeReceiverId && data.receiverId === userStore.user?.id) ||
               (data.senderId === userStore.user?.id && data.receiverId === this.activeReceiverId)) {
@@ -121,13 +138,27 @@ export const useChatStore = defineStore('chat', {
           receiverId: this.activeReceiverId,
           type,
           mediaUrl,
-          CreatedAt: new Date().toISOString()
+          CreatedAt: new Date().toISOString(),
+          isRead: false
         }
         this.socket.send(JSON.stringify(msg))
         
         // Optimistically append message to local view
         this.messages.push(msg)
       }
+    },
+    // 发送已读回执
+    sendReadAck() {
+        if (this.socket && this.isConnected && this.activeReceiverId) {
+            const userStore = useUserStore()
+            const msg = {
+                senderId: userStore.user?.id || 0,
+                receiverId: this.activeReceiverId,
+                type: 'read_ack',
+                content: 'read'
+            }
+            this.socket.send(JSON.stringify(msg))
+        }
     },
     disconnect() {
         if (this.socket) {

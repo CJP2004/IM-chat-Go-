@@ -19,6 +19,7 @@ func (s *MessageService) SaveMessage(senderID, receiverID uint, content, msgType
 		Content:    content,
 		Type:       msgType,
 		MediaURL:   mediaURL,
+		IsRead:     false,
 	}
 
 	// 调用 Model 层保存
@@ -39,4 +40,14 @@ func (s *MessageService) GetHistory(user1ID, user2ID uint) ([]models.Message, er
 // 用于会话列表显示预览
 func (s *MessageService) GetLastMessage(user1ID, user2ID uint) (*models.Message, error) {
 	return models.GetLastMessage(user1ID, user2ID)
+}
+
+// MarkMessagesRead UpdateReadStatus 更新消息已读状态
+// 将指定接收者、指定发送者的所有未读消息标记为已读（简单起见，暂不按 MessageID 逐条更，而是会话维度）
+// 或者根据前端传来的 messageId 列表更新
+// 这里暂时实现：把 user1 发给 user2 的所有消息标记为已读
+func (s *MessageService) MarkMessagesRead(senderID, receiverID uint) error {
+	return models.DB.Model(&models.Message{}).
+		Where("sender_id = ? AND receiver_id = ? AND is_read = ?", senderID, receiverID, false).
+		Update("is_read", true).Error
 }

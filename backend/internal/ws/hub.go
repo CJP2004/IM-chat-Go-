@@ -73,9 +73,18 @@ func (h *Hub) Run() {
 		case msg := <-h.Direct:
 			// 3. 处理私聊消息
 
-			// 通过 Service 层持久化消息到数据库
-			// 注意：这里简单同步入库，高并发下建议使用消息队列或异步处理
-			messageService.SaveMessage(msg.SenderID, msg.ReceiverID, msg.Content, msg.Type, msg.MediaURL)
+			if msg.Type == "read_ack" {
+				// 如果是已读回执
+				// 1. 更新数据库：标记 Sender(A) 已读了 Receiver(B) 发的消息
+				// 所以是标记：Sender_id = Receiver(B), Receiver_id = Sender(A) 的消息为已读
+				err := messageService.MarkMessagesRead(msg.ReceiverID, msg.SenderID)
+				if err != nil {
+					return
+				}
+			} else {
+				// 2. 如果是普通消息，持久化到数据库
+				messageService.SaveMessage(msg.SenderID, msg.ReceiverID, msg.Content, msg.Type, msg.MediaURL)
+			}
 
 			// 根据消息中的 ReceiverID 找到目标客户端
 			if client, ok := h.UserClients[msg.ReceiverID]; ok {

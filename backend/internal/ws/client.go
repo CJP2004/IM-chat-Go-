@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"strconv"
 	"time"
+	"im-chat/internal/models"
+	"im-chat/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -16,7 +18,7 @@ const (
 	writeWait      = 10 * time.Second
 	pongWait       = 60 * time.Second
 	pingPeriod     = (pongWait * 9) / 10
-	maxMessageSize = 512
+	maxMessageSize = 65536 // 64KB，支持长文本消息
 )
 
 // upgrader 用于将 HTTP 连接升级为 WebSocket 连接
@@ -145,14 +147,25 @@ func ServeWs(hub *Hub, c *gin.Context) {
 			userID = uint(id)
 		}
 	}
+
+	// 3. 解析设备信息并更新 Tagline
+	uaString := c.GetHeader("User-Agent")
+	deviceName := utils.ParseDevice(uaString)
+	if userID != 0 {
+		var user models.User
+		if err := models.DB.First(&user, userID).Error; err == nil {
+			user.Tagline = deviceName
+			models.DB.Save(&user)
+		}
+	}
 	
-	// 3. 创建 Client 对象
+	// 4. 创建 Client 对象
 	client := &Client{Hub: hub, ID: userID, Conn: conn, Send: make(chan []byte, 256)}
 	
-	// 4. 注册到 Hub
+	// 5. 注册到 Hub
 	client.Hub.Register <- client
 
-	// 5. 启动读写协程
+	// 6. 启动读写协程
 	// Go 关键字：异步启动 Goroutines
 	go client.WritePump()
 	go client.ReadPump()

@@ -43,20 +43,10 @@
             <div class="ml-4 flex-1">
                 <h3 class="text-sm font-bold text-gray-900 dark:text-gray-100 leading-none">{{ userStore.user?.username || 'User' }}</h3>
                 
-                <!-- Tagline (Editable) -->
-                <!-- Tagline (Editable) -->
-                <div v-if="!isEditingTagline" @click.stop="startEditingTagline" class="text-xs text-amber-500 mt-1 cursor-pointer hover:text-amber-600 transition truncate max-w-[120px] min-h-[1rem]" title="Click to edit">
-                     {{ userStore.user?.tagline || 'Click to set status' }}
+                <!-- Tagline (Read-only, shows device info) -->
+                <div class="text-xs text-amber-500 mt-1 truncate max-w-[120px] min-h-[1rem]" :title="userStore.user?.tagline || 'Unknown Device'">
+                     {{ userStore.user?.tagline || 'Unknown Device' }}
                 </div>
-                <input 
-                    v-else 
-                    v-model="newTagline" 
-                    @blur="saveTagline" 
-                    @keydown.enter="saveTagline"
-                    @click.stop
-                    ref="taglineInput"
-                    class="text-xs text-gray-600 dark:text-gray-200 mt-1 w-full bg-white dark:bg-gray-800 border border-amber-200 dark:border-amber-500/50 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-amber-500" 
-                />
             </div>
         </div>
     </div>
@@ -89,37 +79,7 @@ const userStore = useUserStore()
 const chatStore = useChatStore()
 const toast = useToastStore()
 const avatarInput = ref<HTMLInputElement | null>(null)
-const taglineInput = ref<HTMLInputElement | null>(null)
-const isEditingTagline = ref(false)
-const newTagline = ref('')
-// Start editing
-const startEditingTagline = async () => {
-    isEditingTagline.value = true
-    newTagline.value = userStore.user?.tagline || ''
-    await nextTick()
-    taglineInput.value?.focus()
-}
 
-// Save tagline
-const saveTagline = async () => {
-    isEditingTagline.value = false
-    if (!userStore.user) return
-    
-    // Optimistic update
-    const oldTagline = userStore.user.tagline
-    userStore.user.tagline = newTagline.value
-    userStore.setUser(userStore.user)
-
-    try {
-        await axios.put(`http://localhost:2222/api/user/tagline?userId=${userStore.user.id}`, {
-            tagline: newTagline.value
-        })
-    } catch (e) {
-        console.error("Failed to update tagline", e)
-        userStore.user.tagline = oldTagline // Revert on failure
-        userStore.setUser(userStore.user) 
-    }
-}
 
 // Updating nav items to match Image 1
 const navItems = [

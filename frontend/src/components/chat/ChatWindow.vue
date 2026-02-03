@@ -64,6 +64,22 @@ const filteredMessages = computed(() => {
     })
 })
 
+import { watch } from 'vue'
+
+// 监听消息变化，自动发送已读回执
+watch(() => chatStore.messages.length, () => {
+    if (chatStore.activeReceiverId) {
+        chatStore.sendReadAck()
+    }
+})
+
+// 监听当前聊天对象变化
+watch(() => chatStore.activeReceiverId, (newId) => {
+    if (newId) {
+        chatStore.sendReadAck()
+    }
+})
+
 const handleSend = (text: string) => {
     chatStore.sendMessage(text)
 }
