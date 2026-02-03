@@ -28,6 +28,8 @@ export const useChatStore = defineStore('chat', {
     activeReceiverId: 0 as number,
     socket: null as WebSocket | null,
     isConnected: false,
+    uploadProgress: 0 as number, // 上传进度 0-100
+    isUploading: false, // 是否正在上传
   }),
   actions: {
     async fetchUsers() {
@@ -74,12 +76,30 @@ export const useChatStore = defineStore('chat', {
       }
     },
     async uploadImage(file: File) {
+        this.isUploading = true
+        this.uploadProgress = 0
+        
         const formData = new FormData()
         formData.append('file', file)
-        const res = await axios.post('http://localhost:2222/api/upload', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-        })
-        return res.data.url
+        
+        try {
+            const res = await axios.post('http://localhost:2222/api/upload', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+                onUploadProgress: (progressEvent) => {
+                    if (progressEvent.total) {
+                        this.uploadProgress = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+                    }
+                }
+            })
+            this.uploadProgress = 100
+            return res.data.url
+        } finally {
+            // 短暂延迟后重置状态，让用户看到100%
+            setTimeout(() => {
+                this.isUploading = false
+                this.uploadProgress = 0
+            }, 500)
+        }
     },
     connect() {
       if (this.socket) return

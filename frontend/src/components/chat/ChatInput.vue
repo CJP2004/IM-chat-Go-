@@ -1,5 +1,30 @@
 <template>
   <div class="p-6 bg-transparent">
+    <!-- Upload Progress Preview (matches sent image style) -->
+    <div v-if="chatStore.isUploading" class="mb-4 flex justify-end pr-10">
+        <div class="relative">
+            <div class="overflow-hidden rounded-2xl shadow-sm" style="max-width: 300px;">
+                <img 
+                  v-if="previewUrl" 
+                  :src="previewUrl" 
+                  class="max-w-full block" 
+                  :class="chatStore.uploadProgress < 100 ? 'opacity-70' : 'opacity-100'"
+                  style="max-width: 300px;"
+                />
+            </div>
+            <!-- Progress Overlay (only show when not complete) -->
+            <div 
+              v-if="chatStore.uploadProgress < 100"
+              class="absolute inset-0 flex flex-col items-center justify-center bg-black/40 rounded-2xl"
+            >
+                <div class="text-white text-lg font-bold">{{ chatStore.uploadProgress }}%</div>
+                <div class="w-20 h-1.5 bg-white/30 rounded-full mt-2 overflow-hidden">
+                    <div class="h-full bg-amber-500 rounded-full transition-all duration-200" :style="{ width: chatStore.uploadProgress + '%' }"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="flex items-end space-x-2 bg-white dark:bg-gray-800 rounded-3xl p-2 px-4 shadow-lg shadow-gray-200/50 dark:shadow-black/20 border border-gray-100 dark:border-gray-700 transition-colors duration-200">
         
         <!-- Microphone (Placeholder) -->
@@ -24,7 +49,7 @@
         <!-- Actions -->
         <div class="flex items-center space-x-1 text-gray-400 dark:text-gray-500 mb-1">
              <label class="hover:text-amber-500 transition p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-full cursor-pointer">
-                <input type="file" class="hidden" accept="image/*" @change="handleUpload" />
+                <input type="file" class="hidden" accept="image/*" @change="handleUpload" ref="fileInput" />
                 <PhotoIcon class="w-6 h-6" />
              </label>
              <button class="hover:text-amber-500 transition p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-full">
@@ -47,13 +72,17 @@
 <script setup lang="ts">
 import { ref, nextTick, onMounted } from 'vue'
 import { PhotoIcon, PaperAirplaneIcon, MicrophoneIcon, FaceSmileIcon } from '@heroicons/vue/24/outline'
+import { useChatStore } from '../../stores/chat'
 
 const emit = defineEmits(['send', 'upload'])
+const chatStore = useChatStore()
 const text = ref('')
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
+const fileInput = ref<HTMLInputElement | null>(null)
 const textareaHeight = ref(24) // 初始高度
 const minHeight = 24 // 最小高度
 const maxHeight = 150 // 最大高度限制 (~6行)
+const previewUrl = ref('') // 上传预览图
 
 // 自动调整高度
 const autoResize = () => {
@@ -84,7 +113,15 @@ const newLine = () => {
 
 const handleUpload = (e: any) => {
     const file = e.target.files[0]
-    if (file) emit('upload', file)
+    if (file) {
+        // 生成本地预览
+        previewUrl.value = URL.createObjectURL(file)
+        emit('upload', file)
+    }
+    // 清空 input 以便可以再次选择同一文件
+    if (fileInput.value) {
+        fileInput.value.value = ''
+    }
 }
 
 onMounted(() => {
