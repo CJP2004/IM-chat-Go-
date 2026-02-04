@@ -25,14 +25,35 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	// 调用 Service 层
+	// 调用 Service 层注册
 	err := userService.Register(input.Username, input.Password)
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	response.Success(c, gin.H{"message": "Registration successful"})
+	// 注册成功后自动登录
+	token, user, err := userService.Login(input.Username, input.Password)
+	if err != nil {
+		response.Error(c, http.StatusUnauthorized, err.Error())
+		return
+	}
+
+    // 解析设备信息并更新 Tagline
+	uaString := c.GetHeader("User-Agent")
+	deviceName := utils.ParseDevice(uaString)
+	user.Tagline = deviceName
+	models.DB.Save(&user)
+
+	response.Success(c, gin.H{
+		"token": token,
+		"user": gin.H{
+			"id":       user.ID,
+			"username": user.Username,
+			"avatar":   user.Avatar,
+			"tagline":  user.Tagline,
+		},
+	})
 }
 
 // Login 处理用户登录请求

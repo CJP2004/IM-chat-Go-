@@ -41,10 +41,46 @@ class AuthViewModel: ObservableObject {
         }
     }
     
+    /// 注册方法
+    func register(username: String, password: String) async {
+        guard !username.isEmpty, !password.isEmpty else {
+            self.errorMessage = "Please enter username and password"
+            return
+        }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            let response: LoginResponse = try await APIService.shared.request(
+                endpoint: "/api/register",
+                method: .POST,
+                body: ["username": username, "password": password]
+            )
+            
+            self.token = response.token
+            self.currentUser = response.user
+            self.authState = .authenticated
+            
+            UserDefaults.standard.set(response.token, forKey: tokenKey)
+            if let userData = try? JSONEncoder().encode(response.user) {
+                UserDefaults.standard.set(userData, forKey: userKey)
+            }
+            
+            WebSocketService.shared.connect(userId: response.user.id)
+            
+        } catch {
+            // 直接显示错误的本地化描述 (现在 APIError 已经适配了 LocalizedError)
+            self.errorMessage = error.localizedDescription
+        }
+        
+        isLoading = false
+    }
+
     /// 登录方法
     func login(username: String, password: String) async {
         guard !username.isEmpty, !password.isEmpty else {
-            self.errorMessage = "请输入用户名和密码"
+            self.errorMessage = "Please enter username and password"
             return
         }
         

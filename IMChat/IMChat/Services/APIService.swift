@@ -1,11 +1,20 @@
 import Foundation
 
 /// 网络请求错误枚举
-enum APIError: Error {
+enum APIError: Error, LocalizedError {
     case invalidURL
     case requestFailed
     case decodingFailed
     case custom(message: String)
+    
+    var errorDescription: String? {
+        switch self {
+        case .invalidURL: return "Invalid URL"
+        case .requestFailed: return "Request failed"
+        case .decodingFailed: return "Decoding failed"
+        case .custom(let message): return message
+        }
+    }
 }
 
 /// HTTP 方法枚举
@@ -21,12 +30,6 @@ class APIService {
     private init() {}
     
     /// 通用请求方法
-    /// - Parameters:
-    ///   - endpoint: API 端点 (例如 "/login")
-    ///   - method: HTTP 方法
-    ///   - body: 请求体 (可选)
-    ///   - token: 授权 Token (可选)
-    /// - Returns: 解码后的响应数据
     func request<T: Decodable>(endpoint: String, method: HTTPMethod = .GET, body: [String: Any]? = nil, token: String? = nil) async throws -> T {
         guard let url = URL(string: Constants.baseURL + endpoint) else {
             throw APIError.invalidURL
@@ -55,12 +58,22 @@ class APIService {
                 throw APIError.requestFailed
             }
             
+            // 尝试打印原始数据以调试 (Optional)
+             if let str = String(data: data, encoding: .utf8) {
+                 print("API Response: \(str)")
+             }
+            
             // 解码为标准响应
             let backendResponse = try JSONDecoder().decode(BackendResponse<T>.self, from: data)
             
             // 检查业务状态码
             if backendResponse.code == 200 {
-                return backendResponse.data
+                // 确保 data 存在
+                if let data = backendResponse.data {
+                    return data
+                } else {
+                     throw APIError.custom(message: "Missing data in successful response")
+                }
             } else {
                 throw APIError.custom(message: backendResponse.msg)
             }
@@ -74,8 +87,9 @@ class APIService {
 }
 
 // 定义标准响应结构 (对应 Go 后端 pkg/response/response.go)
+// data 设为可选，因为报错时 info/data 肯能为空
 fileprivate struct BackendResponse<U: Decodable>: Decodable {
     let code: Int
     let msg: String
-    let data: U
+    let data: U?
 }
