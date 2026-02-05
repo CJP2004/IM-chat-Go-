@@ -37,7 +37,7 @@ struct ChatRoomView: View {
             
             // 输入栏
             HStack(spacing: 10) {
-                TextField("输入消息...", text: $viewModel.newMessageText)
+                TextField("Typing Message...", text: $viewModel.newMessageText)
                     .padding(10)
                     .background(Color(.systemGray6))
                     .cornerRadius(20)
@@ -56,11 +56,16 @@ struct ChatRoomView: View {
                 }
             }
             .padding()
-            .background(Color(.systemBackground))
-            .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: -5)
+            .background(Color.black)
+            .shadow(color: Color.white.opacity(0.1), radius: 5, x: 0, y: -5)
         }
         .navigationTitle(viewModel.receiver.username)
         .navigationBarTitleDisplayMode(.inline)
+        // 隐藏底部 Tab Bar (iOS 16+)
+        .toolbar(.hidden, for: .tabBar)
+        // 确保深色背景
+        .background(Color.black)
+        .preferredColorScheme(.dark)
     }
 }
 

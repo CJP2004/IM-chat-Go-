@@ -7,6 +7,8 @@ struct User: Codable, Identifiable {
     let username: String
     let avatar: String
     let tagline: String?
+    let lastMessage: String?
+    let lastMessageTime: String?
     
     // 如果后端的 JSON 键名与属性名不完全一致，可以在这里定义映射
     // 根据前端 stores/chat.ts 来看，User 对象的字段似乎是小写的 (res.data -> User[])

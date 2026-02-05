@@ -11,11 +11,7 @@ struct ContentView: View {
             case .loggedOut:
                 LoginView()
             case .authenticated:
-                // 这里暂时用 Text 占位，下一步我们将创建 ChatListView
-                // ChatListView()
-                NavigationView {
-                    ChatListView()
-                }
+                 MainTabView()
             }
         }
     }

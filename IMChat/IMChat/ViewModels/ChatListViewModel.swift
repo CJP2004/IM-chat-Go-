@@ -39,4 +39,14 @@ class ChatListViewModel: ObservableObject {
         }
         isLoading = false
     }
+    
+    /// 加载模拟数据 (用于预览)
+    func loadMockData() {
+            self.users = [
+                User(id: 1, username: "Elon Musk", avatar: "https://i.pravatar.cc/150?u=1", tagline: "To Mars! 🚀", lastMessage: "Are we going to Mars?", lastMessageTime: "14:30"),
+                User(id: 2, username: "Tim Cook", avatar: "https://i.pravatar.cc/150?u=2", tagline: "Good morning!", lastMessage: "New iPhone is coming.", lastMessageTime: "Yesterday"),
+                User(id: 3, username: "Taylor Swift", avatar: "https://i.pravatar.cc/150?u=3", tagline: "1989 (Taylor's Version)", lastMessage: "Singing...", lastMessageTime: "12:00"),
+                User(id: 4, username: "Gopher", avatar: "https://i.pravatar.cc/150?u=4", tagline: "I love Go language", lastMessage: nil, lastMessageTime: nil)
+            ]
+        }
 }
