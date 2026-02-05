@@ -42,7 +42,7 @@ func ListUsers(c *gin.Context) {
 			continue
 		}
 
-		lastMsgContent := "点击开始聊天..."
+		lastMsgContent := "Click to chat..."
 		lastMsgTime := ""
 
 		// 获取与该用户的最近一条消息
