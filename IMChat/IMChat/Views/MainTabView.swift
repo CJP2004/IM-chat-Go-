@@ -3,49 +3,57 @@ import SwiftUI
 enum Tab {
     case message
     case group
+    case setting
 }
 
 /// 主 Tab 视图
-/// 使用原生 TabView 并配合 UITabBarAppearance 实现液态玻璃效果
 struct MainTabView: View {
     @State private var selectedTab: Tab = .message
     
-    init() {
-        Self.configureAppearance()
-    }
+    // 定义金色
+    let goldColor = Color(red: 212/255, green: 175/255, blue: 55/255)
     
-    /// 配置 TabBar 全局外观 (Liquid Glass)
-    static func configureAppearance() {
-        let appearance = UITabBarAppearance()
-        appearance.configureWithTransparentBackground() // 基础设为透明，以便叠加模糊
-        
-        // 1. 背景效果 (Liquid Glass)
-        appearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterialDark)
-        
-        // 2. 选中项颜色 (金色 - Black Gold)
-        let goldColor = UIColor(red: 212/255, green: 175/255, blue: 55/255, alpha: 1.0)
-        
-        let itemAppearance = UITabBarItemAppearance()
-        
-        // 普通状态 (未选中) - 灰色
-        itemAppearance.normal.iconColor = UIColor.systemGray
-        itemAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor.systemGray]
-        
-        // 选中状态 - 金色
-        itemAppearance.selected.iconColor = goldColor
-        itemAppearance.selected.titleTextAttributes = [.foregroundColor: goldColor]
-        
-        appearance.stackedLayoutAppearance = itemAppearance
-        appearance.inlineLayoutAppearance = itemAppearance
-        appearance.compactInlineLayoutAppearance = itemAppearance
-        
-        // 应用外观配置
-        UITabBar.appearance().standardAppearance = appearance
-        UITabBar.appearance().scrollEdgeAppearance = appearance
-    }
+    init() {
+            // 1. 初始化外观配置
+            let appearance = UITabBarAppearance()
+            
+            // 【关键步骤 1】重置为透明背景
+            appearance.configureWithTransparentBackground()
+            
+            // 【关键步骤 2】一定要把这个背景特效设为 nil
+            //
+            appearance.backgroundEffect = nil
+            
+            // 【关键步骤 3】去掉阴影分割线
+            appearance.shadowColor = .clear
+            appearance.shadowImage = UIImage()
+            
+            // 4. 设置字体和图标颜色 (保持之前的黑金配色不变)
+            let uiGoldColor = UIColor(red: 212/255, green: 175/255, blue: 55/255, alpha: 1.0)
+            let uiGrayColor = UIColor.systemGray
+            
+            let itemAppearance = UITabBarItemAppearance()
+            
+            // 未选中状态
+            itemAppearance.normal.iconColor = uiGrayColor
+            itemAppearance.normal.titleTextAttributes = [.foregroundColor: uiGrayColor]
+            
+            // 选中状态
+            itemAppearance.selected.iconColor = uiGoldColor
+            itemAppearance.selected.titleTextAttributes = [.foregroundColor: uiGoldColor]
+            
+            appearance.stackedLayoutAppearance = itemAppearance
+            appearance.inlineLayoutAppearance = itemAppearance
+            appearance.compactInlineLayoutAppearance = itemAppearance
+            
+            // 5. 应用到全局
+            UITabBar.appearance().standardAppearance = appearance
+            UITabBar.appearance().scrollEdgeAppearance = appearance
+        }
     
     var body: some View {
         TabView(selection: $selectedTab) {
+            // 1. 消息页面
             NavigationStack {
                 ChatListView()
             }
@@ -55,6 +63,7 @@ struct MainTabView: View {
             }
             .tag(Tab.message)
             
+            // 2. 群组页面
             NavigationStack {
                 GroupListView()
             }
@@ -63,11 +72,24 @@ struct MainTabView: View {
                 Text("Group")
             }
             .tag(Tab.group)
+            
+            // 3. 设置页面
+            NavigationStack {
+                ProfileView()
+            }
+            .tabItem {
+                Image(systemName: "gearshape.fill")
+                Text("Setting")
+            }
+            .tag(Tab.setting)
         }
-        // 强制深色模式以配合 Black Gold 主题
-        .preferredColorScheme(.dark)
-        // 强调色 (Tint Color) 也会影响 TabView 选中态，再设置一次以防万一
-        .accentColor(Color(red: 212/255, green: 175/255, blue: 55/255))
+        .ignoresSafeArea(.keyboard) // 键盘弹出时 TabBar 不会上移
+        .preferredColorScheme(.dark) // 强制深色模式
+        .accentColor(goldColor) // 再次确保 SwiftUI 层面的选中色也是金色
     }
 }
 
+#Preview {
+    MainTabView()
+        .environmentObject(AuthViewModel()) // 记得注入环境对象防止 Crash
+}
