@@ -131,4 +131,21 @@ class AuthViewModel: ObservableObject {
         self.currentUser = nil
         self.authState = .loggedOut
     }
+
+    /// 更新当前用户头像并持久化
+    func updateCurrentUserAvatar(url: String) {
+        guard let user = currentUser else { return }
+        let updatedUser = User(
+            id: user.id,
+            username: user.username,
+            avatar: url,
+            tagline: user.tagline,
+            lastMessage: user.lastMessage,
+            lastMessageTime: user.lastMessageTime
+        )
+        self.currentUser = updatedUser
+        if let userData = try? JSONEncoder().encode(updatedUser) {
+            UserDefaults.standard.set(userData, forKey: userKey)
+        }
+    }
 }

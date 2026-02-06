@@ -39,8 +39,10 @@ struct ChatRoomView: View {
             HStack(spacing: 10) {
                 TextField("Typing Message...", text: $viewModel.newMessageText)
                     .padding(10)
-                    .background(Color(.systemGray6))
-                    .cornerRadius(20)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color.theme.glassEffect)
+                    )
                     .focused($isInputFocused)
                     .submitLabel(.send)
                     .onSubmit {
@@ -52,11 +54,11 @@ struct ChatRoomView: View {
                 }) {
                     Image(systemName: "paperplane.fill")
                         .font(.system(size: 22))
-                        .foregroundColor(.blue)
+                        .foregroundColor(Color.theme.gold)
                 }
             }
             .padding()
-            .background(Color.black)
+            .background(Color.theme.background)
             .shadow(color: Color.white.opacity(0.1), radius: 5, x: 0, y: -5)
         }
         .navigationTitle(viewModel.receiver.username)
@@ -64,7 +66,7 @@ struct ChatRoomView: View {
         // 隐藏底部 Tab Bar (iOS 16+)
         .toolbar(.hidden, for: .tabBar)
         // 确保深色背景
-        .background(Color.black)
+        .background(Color.theme.background)
         .preferredColorScheme(.dark)
     }
 }
@@ -95,9 +97,18 @@ struct MessageBubble: View {
                     // 文本消息
                     Text(message.content)
                         .padding(12)
-                        .background(isCurrentUser ? Color.blue : Color(.systemGray5))
+                        .background(
+                            Group {
+                                if isCurrentUser {
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(Color.theme.goldGradient)
+                                } else {
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(Color(.systemGray5))
+                                }
+                            }
+                        )
                         .foregroundColor(isCurrentUser ? .white : .primary)
-                        .cornerRadius(16)
                 }
             }
             

@@ -1,12 +1,19 @@
 import SwiftUI
+import UIKit
 import Kingfisher
 
 // MARK: - 主视图 ProfileView
 struct ProfileView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
-    
-    // 金色主题色
-    let goldColor = Color(red: 212/255, green: 175/255, blue: 55/255)
+
+    @State private var showAvatarOptions = false
+    @State private var showImagePicker = false
+    @State private var pickerSource: UIImagePickerController.SourceType = .photoLibrary
+    @State private var isUploading = false
+    @State private var alertMessage: String?
+
+    // 原生弹窗在大屏设备会以 Popover 展示，调整这个值可下移锚点
+    private let avatarDialogYOffset: CGFloat = 70
     
     var body: some View {
         ZStack {
@@ -23,61 +30,90 @@ struct ProfileView: View {
             } else {
                 Color.black.ignoresSafeArea()
             }
-            
+
             // 2. 主要内容层
             VStack(spacing: 0) {
                 Spacer().frame(height: 20)
                 
                 if let user = authViewModel.currentUser {
                     // --- 头像区域 ---
-                    Button(action: {
-                        print("Change Avatar Tapped")
-                    }) {
-                        ZStack {
-                            // 光晕
-                            Circle()
-                                .fill(goldColor.opacity(0.4))
-                                .frame(width: 170, height: 170)
-                                .blur(radius: 30)
-                            
-                            KFImage(URL(string: user.avatar))
-                                .resizable()
-                                .placeholder {
-                                    Image(systemName: "person.fill")
-                                        .resizable()
-                                        .padding(40)
-                                        .foregroundColor(.white.opacity(0.5))
+                    ZStack {
+                        Button(action: {
+                            showAvatarOptions = true
+                        }) {
+                            ZStack {
+                                // 光晕
+                                Circle()
+                                    .fill(Color.theme.gold.opacity(0.4))
+                                    .frame(width: 170, height: 170)
+                                    .blur(radius: 30)
+                                
+                                KFImage(URL(string: user.avatar))
+                                    .resizable()
+                                    .placeholder {
+                                        Image(systemName: "person.fill")
+                                            .resizable()
+                                            .padding(40)
+                                            .foregroundColor(.white.opacity(0.5))
+                                    }
+                                    .scaledToFill()
+                                    .frame(width: 140, height: 140)
+                                    .clipShape(Circle())
+                                    .overlay(
+                                        Circle().stroke(Color.theme.gold, lineWidth: 2)
+                                    )
+                                    .shadow(color: .black.opacity(0.5), radius: 10, x: 0, y: 5)
+                                
+                                if isUploading {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        .scaleEffect(1.1)
                                 }
-                                .scaledToFill()
-                                .frame(width: 140, height: 140)
-                                .clipShape(Circle())
-                                .overlay(
-                                    Circle().stroke(goldColor, lineWidth: 2)
-                                )
-                                .shadow(color: .black.opacity(0.5), radius: 10, x: 0, y: 5)
-                            
-                            // 相机图标
-                            VStack {
-                                Spacer()
-                                HStack {
+                                
+                                // 相机图标
+                                VStack {
                                     Spacer()
-                                    Image(systemName: "camera.fill")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(.white)
-                                        .padding(8)
-                                        .background(.ultraThinMaterial)
-                                        .background(goldColor.opacity(0.5))
-                                        .clipShape(Circle())
-                                        .overlay(
-                                            Circle().stroke(Color.white.opacity(0.3), lineWidth: 1)
-                                        )
-                                        .offset(x: -10, y: -5)
+                                    HStack {
+                                        Spacer()
+                                        Image(systemName: "camera.fill")
+                                            .font(.system(size: 12))
+                                            .foregroundColor(.white)
+                                            .padding(8)
+                                            .background(.ultraThinMaterial)
+                                            .background(Color.theme.gold.opacity(0.5))
+                                            .clipShape(Circle())
+                                            .overlay(
+                                                Circle().stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                            )
+                                            .offset(x: -10, y: -5)
+                                    }
                                 }
+                                .frame(width: 140, height: 140)
                             }
-                            .frame(width: 140, height: 140)
                         }
+                        .buttonStyle(PlainButtonStyle())
+
+                        // 原生弹窗锚点：用透明视图下移锚点位置
+                        Color.clear
+                            .frame(width: 1, height: 1)
+                            .offset(y: avatarDialogYOffset)
+                            .allowsHitTesting(false)
+                            .confirmationDialog("Change profile picture", isPresented: $showAvatarOptions, titleVisibility: .visible) {
+                                Button("Album") {
+                                    pickerSource = .photoLibrary
+                                    showImagePicker = true
+                                }
+                                Button("camera") {
+                                    if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                                        pickerSource = .camera
+                                        showImagePicker = true
+                                    } else {
+                                        alertMessage = "The current device does not support the camera."
+                                    }
+                                }
+                                Button("Cancel", role: .cancel) {}
+                            }
                     }
-                    .buttonStyle(PlainButtonStyle())
                     
                     Spacer().frame(height: 20)
                     
@@ -90,7 +126,7 @@ struct ProfileView: View {
                     // --- 胶囊标签 ---
                     HStack(spacing: 12) {
                         TagCapsule(text: "Designer", icon: "paintbrush.fill")
-                        TagCapsule(text: "VIP", icon: "star.fill", color: goldColor)
+                        TagCapsule(text: "VIP", icon: "star.fill", color: Color.theme.gold)
                     }
                     .padding(.top, 15)
                     
@@ -119,7 +155,7 @@ struct ProfileView: View {
         .toolbarBackground(.hidden, for: .tabBar)
         .toolbarBackground(.hidden, for: .navigationBar)
         
-        // --- 右上角退出按钮 (修复版) ---
+        // --- 右上角退出按钮 ---
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: {
@@ -130,6 +166,60 @@ struct ProfileView: View {
                         .offset(x: 2) // 视觉修正：向右微调以居中
                 }
             }
+        }
+        .sheet(isPresented: $showImagePicker) {
+            ImagePicker(
+                sourceType: pickerSource,
+                onImagePicked: { image in
+                    showImagePicker = false
+                    uploadAvatar(image)
+                },
+                onCancel: {
+                    showImagePicker = false
+                }
+            )
+            .ignoresSafeArea()
+        }
+        .alert("提示", isPresented: Binding<Bool>(
+            get: { alertMessage != nil },
+            set: { _ in alertMessage = nil }
+        )) {
+            Button("确定", role: .cancel) {}
+        } message: {
+            Text(alertMessage ?? "")
+        }
+    }
+
+    /// 上传头像并更新用户信息
+    @MainActor
+    private func uploadAvatar(_ image: UIImage) {
+        guard let currentUser = authViewModel.currentUser else { return }
+        guard let data = image.jpegData(compressionQuality: 0.85) else {
+            alertMessage = "Image processing failed."
+            return
+        }
+
+        isUploading = true
+        Task {
+            do {
+                let url = try await APIService.shared.uploadImage(
+                    data: data,
+                    filename: "avatar.jpg",
+                    token: authViewModel.token
+                )
+
+                let response: AvatarResponse = try await APIService.shared.request(
+                    endpoint: "/api/user/avatar?userId=\(currentUser.id)",
+                    method: .PUT,
+                    body: ["avatar": url],
+                    token: authViewModel.token
+                )
+
+                authViewModel.updateCurrentUserAvatar(url: response.avatar)
+            } catch {
+                alertMessage = error.localizedDescription
+            }
+            isUploading = false
         }
     }
 }

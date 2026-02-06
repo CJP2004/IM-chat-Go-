@@ -21,6 +21,7 @@ enum APIError: Error, LocalizedError {
 enum HTTPMethod: String {
     case GET
     case POST
+    case PUT
 }
 
 /// API 服务管理类 (单例)
@@ -84,6 +85,44 @@ class APIService {
             throw error
         }
     }
+
+    /// 上传图片（multipart/form-data）
+    func uploadImage(data: Data, filename: String, token: String? = nil) async throws -> String {
+        guard let url = URL(string: Constants.baseURL + "/api/upload") else {
+            throw APIError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = HTTPMethod.POST.rawValue
+
+        let boundary = "Boundary-\(UUID().uuidString)"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+
+        if let token = token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        var body = Data()
+        body.appendString("--\(boundary)\r\n")
+        body.appendString("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n")
+        body.appendString("Content-Type: image/jpeg\r\n\r\n")
+        body.append(data)
+        body.appendString("\r\n--\(boundary)--\r\n")
+
+        request.httpBody = body
+
+        let (responseData, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.requestFailed
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw APIError.custom(message: "上传失败，状态码: \(httpResponse.statusCode)")
+        }
+
+        let uploadResponse = try JSONDecoder().decode(UploadResponse.self, from: responseData)
+        return uploadResponse.url
+    }
 }
 
 // 定义标准响应结构 (对应 Go 后端 pkg/response/response.go)
@@ -92,4 +131,18 @@ fileprivate struct BackendResponse<U: Decodable>: Decodable {
     let code: Int
     let msg: String
     let data: U?
+}
+
+/// 上传接口返回结构
+fileprivate struct UploadResponse: Decodable {
+    let url: String
+}
+
+/// Data 拼接工具
+fileprivate extension Data {
+    mutating func appendString(_ string: String) {
+        if let data = string.data(using: .utf8) {
+            append(data)
+        }
+    }
 }

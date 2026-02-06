@@ -10,9 +10,6 @@ enum Tab {
 struct MainTabView: View {
     @State private var selectedTab: Tab = .message
     
-    // 定义金色
-    let goldColor = Color(red: 212/255, green: 175/255, blue: 55/255)
-    
     init() {
             // 1. 初始化外观配置
             let appearance = UITabBarAppearance()
@@ -29,7 +26,7 @@ struct MainTabView: View {
             appearance.shadowImage = UIImage()
             
             // 4. 设置字体和图标颜色 (保持之前的黑金配色不变)
-            let uiGoldColor = UIColor(red: 212/255, green: 175/255, blue: 55/255, alpha: 1.0)
+            let uiGoldColor = UIColor.theme.gold
             let uiGrayColor = UIColor.systemGray
             
             let itemAppearance = UITabBarItemAppearance()
@@ -85,7 +82,7 @@ struct MainTabView: View {
         }
         .ignoresSafeArea(.keyboard) // 键盘弹出时 TabBar 不会上移
         .preferredColorScheme(.dark) // 强制深色模式
-        .accentColor(goldColor) // 再次确保 SwiftUI 层面的选中色也是金色
+        .accentColor(Color.theme.gold) // 再次确保 SwiftUI 层面的选中色也是金色
     }
 }
 
