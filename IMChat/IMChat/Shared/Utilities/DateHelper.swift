@@ -8,6 +8,7 @@ FILE-GUIDE: DateHelper.swift
 import Foundation
 
 struct DateHelper {
+    /// 把后端时间字符串格式化为列表展示文案：当天显示 `HH:mm`，非当天显示 `yyyy-MM-dd`。
     static func formatMessageTime(_ timeString: String) -> String {
         // 假设输入格式为 "yyyy-MM-dd HH:mm:ss" 或 "yyyy-MM-dd HH:mm"
         // 尝试解析

@@ -16,14 +16,17 @@ final class ProfileViewModel: ObservableObject {
 
     private let repository: ProfileRepository
 
+    /// 注入个人资料数据层依赖。
     init(repository: ProfileRepository) {
         self.repository = repository
     }
 
+    /// 清空页面错误提示，通常在弹窗关闭后调用。
     func clearError() {
         errorMessage = nil
     }
 
+    /// 头像上传总流程：图片压缩 -> token 校验 -> 上传文件 -> 更新头像字段。
     func uploadAvatar(
         image: UIImage,
         token: String?

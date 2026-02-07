@@ -2,7 +2,7 @@
 
 - 评估日期：2026-02-07
 - 评估范围：`IMChat/`（iOS SwiftUI 前端） + `backend/`（Go + Gin + GORM 后端）
-- 结论摘要：当前架构在“小到中型项目”范围内整体合理，可持续迭代；但在安全、鉴权闭环、前后端协议一致性方面存在高优先级风险，暂不建议直接作为生产架构上线。
+- 结论摘要：当前架构在“小到中型项目”范围内整体合理，且鉴权闭环与聊天契约已完成关键修复；现阶段主要剩余风险集中在配置治理、CORS、响应一致性与测试覆盖，补齐后可进一步评估生产上线。
 
 ## 1. 当前总体架构
 
@@ -42,179 +42,187 @@
 - WebSocket Hub：`backend/internal/ws/hub.go`
 - 统一响应：`backend/pkg/response/response.go`
 
-## 2. 架构合理性评估
+## 2. 架构合理性评估（按当前代码状态）
 
 ## 2.1 前端架构是否合理
 
-结论：**合理（7.5/10）**。
+结论：**合理（8/10）**。
 
 优点：
 
-- 已从“页面直连 API”提升为 `View -> ViewModel -> Repository -> APIClient` 分层。
-- `AppContainer` 统一装配依赖，解耦了 View 层对象创建。
-- `SessionStore` 单独管理 token 和 user，状态边界清晰。
-- 聊天模块进行了 REST/WS DTO 与 Domain Model 分离，利于协议演进。
-- WebSocket 服务具备重连、心跳、离线队列，可靠性设计较完整。
+- 已形成 `View -> ViewModel -> Repository -> APIClient` 清晰分层。
+- `AppContainer` 负责依赖装配，页面不直接 new 业务对象。
+- `SessionStore` + `SessionStorage` 边界明确，支持 Keychain 持久化 token。
+- 聊天模块已对齐 REST/WS 双通道数据模型，支持乐观消息和回执替换。
+- WebSocket 客户端具备重连、心跳、离线队列，弱网可用性较好。
 
 不足：
 
-- 个别状态透传重复（`AppSessionStore` 与 `AuthViewModel` 之间有二次恢复）。
-- 页面层仍有部分较重逻辑（例如 `LoginView` 与 `ProfileView` 视图代码偏长）。
-- 端到端自动化测试为空（无 XCTest 覆盖）。
+- 视图层仍偏重（`LoginView`、`ProfileView` UI 逻辑较长）。
+- 少量状态职责有重叠（`AuthViewModel` 与 `AppSessionStore` 都有 restore 逻辑）。
+- 仍缺少自动化测试（XCTest）。
 
 ## 2.2 后端架构是否合理
 
-结论：**基本合理（6.5/10）**。
+结论：**较合理（7.5/10）**。
 
 优点：
 
-- 启动、路由、业务、数据层已拆分，不是单文件“巨型 main.go”。
-- `service` 层封装了注册登录、消息落库等核心流程。
-- WebSocket Hub 架构清晰，支持用户连接映射与定向推送。
+- 已实现 HTTP/WS 鉴权闭环：`middleware.HTTPAuth()` 统一解析 Bearer token 并注入 `userID`。
+- WS 身份绑定从 query 参数迁移为 token 上下文读取，且 `senderId` 由服务端强制覆盖。
+- `/api/messages` 已实现分页参数解析和分页查询（`page/pageSize`）。
+- WS 消息结构已支持 `clientMessageId` + `messageId`，前端乐观更新可闭环。
+- 统一响应层已具备业务码常量（`response.Code*`）和 `ErrorWithCode`。
 
 不足：
 
-- 鉴权未形成闭环（JWT 生成了，但未用于路由鉴权与 WS 鉴权）。
-- 部分 handler 直接操作 model，绕过 service（分层边界被穿透）。
-- 错误处理与失败补偿不足（消息落库失败/已读更新失败处理不完整）。
+- 配置治理未闭环：仍缺 `config.example.yaml` / `.env.example` 模板；本地配置文件是明文凭证。
+- CORS 仍有冲突配置：`Allow-Origin=*` 与 `Allow-Credentials=true` 同时存在。
+- 分层边界仍不完全统一：部分 handler 仍直接落到 model（未完全经 service）。
+- 接口响应风格不完全一致：`/api/upload` 仍返回 raw JSON，而非统一 `code/msg/data`。
 
 ## 2.3 前后端整体耦合是否合理
 
-结论：**能跑通，但契约一致性还有明显缺口（6/10）**。
+结论：**可持续迭代（7.5/10）**。
 
-优点：
+已对齐点：
 
-- REST 包装格式 `code/msg/data` 与前端 `APIClient` 默认解码风格一致。
-- 主要接口路径一致（`/api/login`、`/api/register`、`/api/users`、`/api/messages`、`/api/user/avatar`、`/ws`）。
+- 鉴权对齐：前端 `Authorization: Bearer` 与后端鉴权中间件已打通。
+- 分页对齐：前端 `page/pageSize` 与后端消息分页实现一致。
+- 回执对齐：WS `clientMessageId/messageId` 已与前端乐观消息替换机制对齐。
+- 错误码对齐：后端已引入业务码，不再把 HTTP code 当作业务 code 直接返回给前端字段。
 
-缺口：
+剩余耦合点：
 
-- 聊天历史分页：前端传 `page/pageSize`，后端未实现分页，导致“接口语义不一致”。
-- WS 消息回执字段：前端期望 `clientMessageId/messageId` 来确认乐观消息，后端未透传。
-- 安全约束：前端传 `Authorization`，后端多数接口未验证；WS 仍用 `userId` query 可伪造身份。
+- 上传接口返回体风格与其他接口不一致（raw vs wrapped）。
+- 一些错误仍通过 HTTP->业务码映射自动生成，业务语义码粒度仍可细化。
 
-## 3. 关键问题清单（按优先级）
+## 3. 当前关键问题清单（按优先级）
 
 ### P0（必须优先）
 
-1. 明文敏感信息已进入仓库
-- 文件：`backend/config.yaml`
-- 问题：包含 MySQL、Redis、COS `secret_id/secret_key` 等真实凭证。
-- 风险：凭证泄露、资源被盗用、数据泄露。
+1. 本地配置仍含明文真实凭证，且缺少可提交的模板配置文件
+- 文件：`backend/config.yaml`、`backend/.env`
+- 风险：误提交或分发时造成密钥泄露；团队协作缺统一模板。
 
-2. 后端缺少鉴权中间件
-- 文件：`backend/internal/router/router.go`、`backend/pkg/utils/jwt.go`
-- 问题：除登录注册外的接口与 WS 未校验 token。
-- 风险：任何人可伪造 `userId` 更新头像、伪造 WS 身份发消息。
-
-3. WS 身份绑定不安全
-- 文件：`backend/internal/ws/client.go`
-- 问题：`ServeWs` 通过 query 参数读取 `userId`。
-- 风险：冒充他人在线会话。
+2. CORS 配置存在语义冲突
+- 文件：`backend/internal/router/router.go`
+- 问题：`Allow-Origin=*` 与 `Allow-Credentials=true` 同时设置。
+- 风险：浏览器行为不确定，生产环境跨域策略不可控。
 
 ### P1（应尽快）
 
-4. 聊天分页契约不一致
-- 前端：`IMChat/IMChat/Features/Chat/Data/ChatRepository.swift`
-- 后端：`backend/internal/handlers/message.go` + `backend/internal/models/message.go`
-- 问题：前端按页加载，后端实际返回全量。
+3. 响应契约尚未完全统一
+- 文件：`backend/internal/handlers/upload.go`
+- 问题：`/api/upload` 返回 raw JSON，其他接口使用 `code/msg/data`。
 
-5. WS 乐观消息确认链路不完整
-- 前端：`IMChat/IMChat/Features/Chat/Presentation/ChatViewModel.swift`
-- 后端：`backend/internal/ws/message.go`、`backend/internal/ws/hub.go`
-- 问题：后端未回传 `clientMessageId` 或服务端 `messageId`，前端难以精准替换本地临时消息。
+4. 分层边界未完全收敛
+- 文件：`backend/internal/handlers/user.go`、`backend/internal/ws/client.go`
+- 问题：仍有 handler/WS 层直接操作 model。
 
-6. Hub 的错误处理会导致实时服务中断风险
-- 文件：`backend/internal/ws/hub.go`
-- 问题：`read_ack` 更新失败后 `return`，会退出 `Run()` 主循环。
+5. 业务错误码规范仍可细化
+- 文件：`backend/pkg/response/response.go`、各 handler
+- 问题：当前可用，但部分错误仍依赖 HTTP 到业务码映射，未建立更细粒度业务码字典。
 
 ### P2（中期优化）
 
-7. 分层边界未完全统一
-- 文件：`backend/internal/handlers/user.go`
-- 问题：`UpdateAvatar/UpdateTagline` 直接操作 `models.DB`。
-
-8. CORS 配置不规范
-- 文件：`backend/internal/router/router.go`
-- 问题：`Allow-Origin=*` 同时 `Allow-Credentials=true`，浏览器语义冲突。
-
-9. 配置治理不足
-- 文件：`backend/internal/config/config.go`
-- 问题：仅读本地 yaml，缺少按环境覆盖、敏感字段脱敏日志策略。
-
-10. 测试缺失
+6. 测试缺失
 - 前端：无 XCTest
 - 后端：无 `_test.go`
 
-## 4. 数据流评估
+7. 可观测性不足
+- 问题：缺 request_id、user_id、latency 等统一日志字段与监控指标。
+
+### 3.1 已完成项（相较初版评估）
+
+- 已完成 HTTP 鉴权中间件并接入受保护路由：`backend/internal/middleware/auth.go`、`backend/internal/router/router.go`
+- 已完成 WS 鉴权接入与用户身份绑定修复：`backend/internal/router/router.go`、`backend/internal/ws/client.go`
+- 已完成消息分页：`backend/internal/handlers/message.go`、`backend/internal/models/message.go`、`backend/internal/service/message.go`
+- 已完成 WS 回执字段对齐：`backend/internal/ws/message.go`、`backend/internal/ws/hub.go`
+- 已引入业务码体系：`backend/pkg/response/response.go`
+- 已修复 Hub 在 `read_ack` 更新失败时直接退出主循环的问题（`return` -> `continue`）：`backend/internal/ws/hub.go`
+
+## 4. 数据流评估（更新版）
 
 ### 4.1 登录链路
 
 - 前端 `AuthRepository` -> `POST /api/login`
 - 后端 `handlers.Login` -> `service.UserService.Login`
-- 成功后前端保存会话并启动 WS
+- 登录后前端保存会话并启动 WS
+- 后续受保护接口与 WS 入口均经 `HTTPAuth` 校验 token
 
-评估：流程清晰，但 token 未在后续后端接口强制验证。
+评估：登录与鉴权链路已闭环，安全性明显提升。
 
 ### 4.2 聊天链路（HTTP + WS）
 
-- 前端历史：`GET /api/messages?senderId&receiverId&page&pageSize`
-- 后端历史：当前忽略分页参数，返回全量
+- 前端历史：`GET /api/messages?receiverId&page&pageSize`
+- 后端历史：按 `page/pageSize` 查询并返回升序消息
 - 前端发送：WS 发送消息（含 `clientMessageId`）
-- 后端转发：当前仅回传基础字段，不含确认字段
+- 后端回执：落库后回传 `messageId`，并回显给发送方和接收方
 
-评估：基础功能可用，但“高并发/长历史/弱网”场景体验会受影响。
+评估：核心契约已打通，聊天体验相关基础能力已到位。
 
 ### 4.3 头像上传链路
 
-- 前端：先 `/api/upload`，后 `/api/user/avatar?userId=...`
-- 后端：上传返回 raw JSON，更新头像返回 wrapped JSON
+- 前端：`/api/upload` 上传文件 -> `/api/user/avatar` 更新资料
+- 后端：两个接口都在受保护路由组内（需 token）
 
-评估：链路可用；鉴权和权限校验需补齐（当前可越权修改）。
+评估：权限安全已修复；剩余问题是上传接口返回风格尚未统一。
 
-## 5. 建议的目标架构（简版）
+## 5. 建议的目标架构（当前阶段）
 
-前端目标：保持现有结构，仅做增强。
+前端目标：保持现有结构，继续工程化。
 
-- 保持：`App/Core/Features/Shared` 四层
-- 增强：
-  - 把契约模型（Request/Response DTO）集中到 `Shared/APIContracts` 或 `Core/Networking/Contracts`
-  - 给 `ChatViewModel` 增加“消息状态机”（sending/sent/failed）
-  - 增加最小测试集（Repository + ViewModel）
+- 保持：`App/Core/Features/Shared` 四层结构
+- 建议：
+  - 为关键 ViewModel 增加 XCTest（认证、会话列表、聊天分页）
+  - 把大体量视图拆分成更细组件（尤其 `LoginView`、`ProfileView`）
 
-后端目标：补齐“安全 + 契约 + 可观测性”。
+后端目标：从“功能可用”提升到“可上线维护”。
 
-- 新增 `middleware/auth.go`：HTTP JWT 解析并注入 `userID`
-- WS 入口改为 `Authorization` 校验，禁止 query userId
-- `message` 接口支持真正分页（`offset/limit` 或 cursor）
-- WS 消息结构扩展：`clientMessageId`（回显）+ `messageId`（落库后回传）
-- 引入基础日志字段：request_id、user_id、latency、error_code
+- 补齐 `config.example.yaml` 与 `.env.example`，并规范敏感配置管理
+- 修复 CORS 为白名单策略（按环境配置 origin）
+- 统一所有接口响应格式（包含上传接口）
+- 继续收敛到 `handler -> service -> model` 单向依赖
+- 增加基础可观测性与测试覆盖
 
-## 6. 分阶段改造路线
+## 6. 分阶段改造路线（按当前完成度）
 
-### Phase 1（1-2 天）安全兜底
+### Phase 1（安全兜底）状态：**部分完成**
 
-- 下线并轮换已泄露密钥（MySQL/Redis/COS/JWT）
-- 增加 `.env` + `config.example.yaml`，禁止真实凭证入库
-- 实现 HTTP/WS 鉴权中间件，统一从 token 取 userID
+已完成：
 
-### Phase 2（2-3 天）契约对齐
+- HTTP/WS 鉴权中间件落地，统一从 token 提取 userID
+- WS 身份绑定已改为 token 上下文，不再信任 query userId
 
-- `/api/messages` 实现分页
-- WS 消息回执字段对齐前端（`clientMessageId`、`messageId`）
-- 统一错误码（业务 code，不直接使用 HTTP code 充当业务 code）
+未完成：
 
-### Phase 3（3-5 天）工程质量
+- 密钥轮换与模板化配置（`config.example.yaml` / `.env.example`）仍需补齐
 
-- Handler 仅做参数校验与编排，业务逻辑下沉 service
-- 增加单元测试（至少覆盖登录、消息历史、WS 转发）
-- 增加基础性能与稳定性指标（慢查询、连接数、重连次数）
+### Phase 2（契约对齐）状态：**基本完成**
 
-## 7. 最终判断
+已完成：
 
-- 你的前后端架构方向是对的，已经具备继续演进的结构基础。
-- 若目标是“课程项目/演示环境”，当前可继续迭代。
-- 若目标是“可上线服务”，必须先完成 P0 与 P1（尤其安全与鉴权闭环），再谈功能扩展。
+- `/api/messages` 分页
+- WS 回执字段 `clientMessageId/messageId` 对齐
+- 业务码体系落地（`Code*` + `ErrorWithCode`）
+
+待完善：
+
+- 上传接口响应体统一到 `code/msg/data`
+- 业务码字典可继续细化
+
+### Phase 3（工程质量）状态：**未开始/进行中**
+
+- 分层收敛（减少 handler 直接操作 model）
+- 增加单元测试
+- 引入可观测性指标与日志标准字段
+
+## 7. 最终判断（更新）
+
+- 当前前后端架构已从“可跑通”提升到“可持续迭代”，尤其在鉴权闭环与聊天契约方面完成了关键修复。
+- 若目标是课程项目/演示环境，当前状态已经较稳。
+- 若目标是生产上线，建议先补齐配置治理（模板与密钥轮换）、CORS、响应一致性和测试，再推进上线。
 
 ## 8. 前端关键业务时序（可对照代码）
 

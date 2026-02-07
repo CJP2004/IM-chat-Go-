@@ -8,7 +8,9 @@ FILE-GUIDE: AuthRepository.swift
 import Foundation
 
 protocol AuthRepository {
+    /// 调用注册接口并返回登录态数据（token + user）。
     func register(username: String, password: String) async throws -> LoginResponse
+    /// 调用登录接口并返回登录态数据（token + user）。
     func login(username: String, password: String) async throws -> LoginResponse
 }
 
@@ -20,10 +22,12 @@ struct AuthRepositoryImpl: AuthRepository {
 
     private let apiClient: APIClientProtocol
 
+    /// 注入网络客户端，便于在测试中替换为 mock。
     init(apiClient: APIClientProtocol) {
         self.apiClient = apiClient
     }
 
+    /// 提交用户名密码到 `/api/register` 并解析注册结果。
     func register(username: String, password: String) async throws -> LoginResponse {
         let request = try APIRequest<LoginResponse>.json(
             path: "/api/register",
@@ -33,6 +37,7 @@ struct AuthRepositoryImpl: AuthRepository {
         return try await apiClient.send(request, token: nil)
     }
 
+    /// 提交用户名密码到 `/api/login` 并解析登录结果。
     func login(username: String, password: String) async throws -> LoginResponse {
         let request = try APIRequest<LoginResponse>.json(
             path: "/api/login",

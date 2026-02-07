@@ -28,6 +28,7 @@ class AuthViewModel: ObservableObject {
     var currentUser: User? { sessionStore.currentUser }
     var token: String? { sessionStore.token }
 
+    /// 装配认证相关依赖并建立会话状态透传订阅。
     init(
         sessionStore: AppSessionStore,
         authRepository: AuthRepository,
@@ -47,7 +48,7 @@ class AuthViewModel: ObservableObject {
         restoreSession()
     }
     
-    /// 恢复上次登录会话
+    /// 恢复持久化会话；若有有效 token，则自动重连 WebSocket。
     func restoreSession() {
         sessionStore.restoreSession()
         if let user = sessionStore.currentUser, let token = sessionStore.token {
@@ -55,7 +56,7 @@ class AuthViewModel: ObservableObject {
         }
     }
     
-    /// 注册方法
+    /// 执行注册流程：参数校验 -> 请求接口 -> 保存会话 -> 建立 WS 连接。
     func register(username: String, password: String) async {
         guard !username.isEmpty, !password.isEmpty else {
             self.errorMessage = "Please enter username and password"
@@ -77,7 +78,7 @@ class AuthViewModel: ObservableObject {
         }
     }
 
-    /// 登录方法
+    /// 执行登录流程：参数校验 -> 请求接口 -> 保存会话 -> 建立 WS 连接。
     func login(username: String, password: String) async {
         guard !username.isEmpty, !password.isEmpty else {
             self.errorMessage = "Please enter username and password"
@@ -102,13 +103,13 @@ class AuthViewModel: ObservableObject {
         }
     }
     
-    /// 登出
+    /// 执行登出：断开 WS 并清理会话持久化数据。
     func logout() {
         webSocketService.disconnect()
         sessionStore.clearSession()
     }
 
-    /// 更新当前用户头像并持久化
+    /// 更新当前用户头像并同步写回会话缓存。
     func updateCurrentUserAvatar(url: String) {
         guard let user = currentUser else { return }
         let updatedUser = User(

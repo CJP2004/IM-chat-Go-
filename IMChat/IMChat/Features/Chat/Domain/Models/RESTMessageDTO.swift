@@ -31,6 +31,7 @@ struct RESTMessageDTO: Decodable {
 }
 
 extension RESTMessageDTO {
+    /// 把历史消息 DTO 转换为统一领域模型，并构造可稳定去重的 `stableId`。
     func toDomain() -> ChatMessage {
         let stableId: String
         if let id {

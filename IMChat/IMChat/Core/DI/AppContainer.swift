@@ -23,6 +23,7 @@ final class AppContainer: ObservableObject {
     let chatListViewModel: ChatListViewModel
     let profileViewModel: ProfileViewModel
 
+    /// 使用外部传入依赖完成整套对象装配，方便测试替换实现。
     init(
         apiClient: APIClientProtocol,
         webSocketService: WebSocketService,
@@ -54,6 +55,7 @@ final class AppContainer: ObservableObject {
         self.profileViewModel = ProfileViewModel(repository: profileRepository)
     }
 
+    /// 生产环境默认装配入口（真实 APIClient + 单例 WebSocket + 本地会话存储）。
     convenience init() {
         self.init(
             apiClient: APIClient(),
@@ -62,6 +64,7 @@ final class AppContainer: ObservableObject {
         )
     }
 
+    /// 为指定会话对象创建独立 ChatViewModel，并注入当前 token 提供器。
     func makeChatViewModel(receiver: User, currentUserId: Int?) -> ChatViewModel {
         ChatViewModel(
             receiver: receiver,

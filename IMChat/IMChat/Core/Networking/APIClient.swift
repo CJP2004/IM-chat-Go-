@@ -49,6 +49,7 @@ struct APIRequest<Response: Decodable> {
     let body: Data?
     let responseStyle: APIResponseStyle
 
+    /// 创建一个通用 API 请求对象（路径、方法、查询、头、包体、响应风格）。
     init(
         path: String,
         method: HTTPMethod = .GET,
@@ -67,6 +68,7 @@ struct APIRequest<Response: Decodable> {
 }
 
 extension APIRequest {
+    /// 快速构建 JSON 请求：自动编码 body，并在需要时补 `Content-Type: application/json`。
     static func json<Body: Encodable>(
         path: String,
         method: HTTPMethod = .GET,
@@ -105,6 +107,7 @@ struct UploadImageRequest {
     let mimeType: String
     let path: String
 
+    /// 创建上传图片请求参数（数据、文件名、MIME、接口路径）。
     init(
         data: Data,
         filename: String,
@@ -119,7 +122,9 @@ struct UploadImageRequest {
 }
 
 protocol APIClientProtocol {
+    /// 发送 HTTP 请求并把响应解码为泛型模型。
     func send<Response: Decodable>(_ request: APIRequest<Response>, token: String?) async throws -> Response
+    /// 上传图片并返回后端返回的可访问 URL。
     func uploadImage(_ request: UploadImageRequest, token: String?) async throws -> String
 }
 
@@ -128,6 +133,7 @@ final class APIClient: APIClientProtocol {
     private let urlSession: URLSession
     private let decoder: JSONDecoder
 
+    /// 创建网络客户端，支持注入 baseURL、URLSession 和解码器。
     init(
         baseURL: String,
         urlSession: URLSession = .shared,
@@ -138,10 +144,12 @@ final class APIClient: APIClientProtocol {
         self.decoder = decoder
     }
 
+    /// 使用全局配置的 `Constants.baseURL` 初始化网络客户端。
     convenience init() {
         self.init(baseURL: Constants.baseURL)
     }
 
+    /// 统一执行 API 请求：组装 URLRequest、附加鉴权头、按响应风格解码结果。
     func send<Response: Decodable>(
         _ request: APIRequest<Response>,
         token: String? = nil
@@ -194,6 +202,7 @@ final class APIClient: APIClientProtocol {
         }
     }
 
+    /// 执行 multipart 图片上传，并从响应中解析出最终图片 URL。
     func uploadImage(_ request: UploadImageRequest, token: String? = nil) async throws -> String {
         guard let url = URL(string: baseURL + request.path) else {
             throw APIError.invalidURL
@@ -242,6 +251,7 @@ final class APIClient: APIClientProtocol {
         }
     }
 
+    /// 解码后端统一包装体 `{code,msg,data}`，并把业务错误转换为 `APIError`。
     private func decodeWrappedResponse<Response: Decodable>(data: Data) throws -> Response {
         do {
             let backendResponse = try decoder.decode(BackendResponse<Response>.self, from: data)
@@ -268,6 +278,7 @@ private struct UploadResponse: Decodable {
 }
 
 private extension Data {
+    /// 便捷追加 UTF-8 字符串到二进制数据（用于 multipart body 拼装）。
     mutating func appendString(_ string: String) {
         if let data = string.data(using: .utf8) {
             append(data)

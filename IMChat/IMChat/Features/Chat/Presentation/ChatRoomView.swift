@@ -19,6 +19,7 @@ struct ChatRoomView: View {
     @FocusState private var isInputFocused: Bool
     @Environment(\.dismiss) private var dismiss
     
+    /// 通过外部传入的会话 VM 初始化页面状态对象。
     init(viewModel: ChatViewModel) {
         _viewModel = StateObject(wrappedValue: viewModel)
     }
@@ -156,6 +157,7 @@ struct ChatRoomView: View {
         .preferredColorScheme(.dark)
     }
 
+    /// 把滚动位置移动到消息列表底部锚点，支持动画与非动画两种模式。
     private func scrollToBottom(using proxy: ScrollViewProxy, animated: Bool) {
         DispatchQueue.main.async {
             if animated {
@@ -168,6 +170,7 @@ struct ChatRoomView: View {
         }
     }
 
+    /// 判断这次消息变化是否只是“头部 prepend 历史消息”，用于避免强制跳到底部。
     private func didOnlyPrependHistory(oldMessages: [ChatMessage], newMessages: [ChatMessage]) -> Bool {
         guard newMessages.count > oldMessages.count else { return false }
         guard oldMessages.last?.stableId == newMessages.last?.stableId else { return false }

@@ -40,6 +40,7 @@ class ChatViewModel: ObservableObject {
         case prepend
     }
     
+    /// 创建会话 VM，初始化订阅并自动触发首屏历史消息加载。
     init(
         receiver: User,
         currentUserId: Int?,
@@ -115,6 +116,7 @@ class ChatViewModel: ObservableObject {
         await loadHistoryPage(currentUserId: currentUserId, token: token, page: nextHistoryPage, mode: .replace)
     }
 
+    /// 当顶部消息出现时按需加载更早历史，避免重复并发请求。
     func loadMoreHistoryIfNeeded(currentMessage: ChatMessage) {
         guard let currentUserId else { return }
         guard let token = tokenProvider(), !token.isEmpty else { return }
@@ -126,6 +128,7 @@ class ChatViewModel: ObservableObject {
         }
     }
 
+    /// 历史分页失败时的重试入口：有首条消息则继续翻页，无消息则重拉首屏。
     func retryLoadMoreHistory() {
         guard let firstMessage = messages.first else {
             Task { await fetchHistory() }
@@ -171,6 +174,7 @@ class ChatViewModel: ObservableObject {
         webSocketService.sendMessage(wsMessage)
     }
 
+    /// 通用历史分页加载器：根据模式执行替换或头插，并维护分页游标状态。
     private func loadHistoryPage(currentUserId: Int, token: String, page: Int, mode: HistoryLoadMode) async {
         guard !isLoadingHistoryPage else { return }
 

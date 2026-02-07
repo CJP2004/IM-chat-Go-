@@ -20,6 +20,7 @@ class ChatListViewModel: ObservableObject {
     private let chatRepository: ChatRepository
     private let tokenProvider: () -> String?
 
+    /// 注入列表所需依赖；token 通过闭包惰性获取，避免强耦合会话对象。
     init(
         chatRepository: ChatRepository,
         tokenProvider: @escaping () -> String? = { nil }

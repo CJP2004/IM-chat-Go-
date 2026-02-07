@@ -8,7 +8,9 @@ FILE-GUIDE: ChatRepository.swift
 import Foundation
 
 protocol ChatRepository {
+    /// 拉取联系人列表（会附带最近一条消息摘要等信息）。
     func fetchUsers(currentUserId: Int, token: String) async throws -> [User]
+    /// 按会话对象和分页参数拉取历史消息。
     func fetchHistory(
         currentUserId: Int,
         receiverId: Int,
@@ -21,10 +23,12 @@ protocol ChatRepository {
 struct ChatRepositoryImpl: ChatRepository {
     private let apiClient: APIClientProtocol
 
+    /// 注入网络客户端，便于替换真实实现或做单元测试。
     init(apiClient: APIClientProtocol) {
         self.apiClient = apiClient
     }
 
+    /// 请求联系人列表接口并返回用户数组。
     func fetchUsers(currentUserId _: Int, token: String) async throws -> [User] {
         let request = APIRequest<[User]>(
             path: "/api/users",
@@ -33,6 +37,7 @@ struct ChatRepositoryImpl: ChatRepository {
         return try await apiClient.send(request, token: token)
     }
 
+    /// 请求历史消息接口，完成 DTO 映射并按时间/ID 做稳定排序。
     func fetchHistory(
         currentUserId _: Int,
         receiverId: Int,
@@ -55,6 +60,7 @@ struct ChatRepositoryImpl: ChatRepository {
             .sorted(by: Self.isMessageEarlier(_:_:))
     }
 
+    /// 比较两条消息的先后顺序：优先比时间，再比服务端ID，最后比稳定ID。
     private static func isMessageEarlier(_ lhs: ChatMessage, _ rhs: ChatMessage) -> Bool {
         let lhsDate = parseDate(lhs.createdAt)
         let rhsDate = parseDate(rhs.createdAt)
@@ -73,6 +79,7 @@ struct ChatRepositoryImpl: ChatRepository {
         return lhs.stableId < rhs.stableId
     }
 
+    /// 兼容多种后端时间格式，尽量把字符串解析成 Date。
     private static func parseDate(_ value: String?) -> Date? {
         guard let value, !value.isEmpty else { return nil }
 

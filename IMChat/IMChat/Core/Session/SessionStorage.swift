@@ -16,15 +16,22 @@ struct StoredSession {
 }
 
 protocol SessionStorage {
+    /// 从持久化层读取完整会话（token + user）；无会话返回 nil。
     func loadSession() -> StoredSession?
+    /// 持久化写入完整会话，通常在登录成功后调用。
     func saveSession(token: String, user: User)
+    /// 仅更新已登录用户资料，不改动 token。
     func updateUser(_ user: User)
+    /// 清除所有会话相关持久化数据。
     func clearSession()
 }
 
 protocol SecureTokenStorage {
+    /// 从安全存储读取 token。
     func loadToken() -> String?
+    /// 把 token 写入安全存储（如 Keychain）。
     func saveToken(_ token: String)
+    /// 从安全存储移除 token。
     func clearToken()
 }
 
@@ -32,6 +39,7 @@ final class KeychainTokenStorage: SecureTokenStorage {
     private let service: String
     private let account: String
 
+    /// 配置 Keychain 条目标识（service/account）。
     init(
         service: String = Bundle.main.bundleIdentifier ?? "com.CyrusChu.IMChat",
         account: String = "auth_token"
@@ -40,6 +48,7 @@ final class KeychainTokenStorage: SecureTokenStorage {
         self.account = account
     }
 
+    /// 从 Keychain 读取 token，并做 Data -> String 解码。
     func loadToken() -> String? {
         var query = baseQuery
         query[kSecReturnData as String] = true
@@ -55,6 +64,7 @@ final class KeychainTokenStorage: SecureTokenStorage {
         return token
     }
 
+    /// 先删旧值再写新值，确保账号下只有一条最新 token。
     func saveToken(_ token: String) {
         clearToken()
 
@@ -64,6 +74,7 @@ final class KeychainTokenStorage: SecureTokenStorage {
         SecItemAdd(query as CFDictionary, nil)
     }
 
+    /// 删除当前 service/account 对应的 Keychain token。
     func clearToken() {
         SecItemDelete(baseQuery as CFDictionary)
     }
@@ -83,6 +94,7 @@ final class UserDefaultsSessionStorage: SessionStorage {
     private let tokenKey: String
     private let userKey: String
 
+    /// 配置 UserDefaults 键名及底层 token 安全存储实现。
     init(
         userDefaults: UserDefaults = .standard,
         tokenStorage: SecureTokenStorage = KeychainTokenStorage(),
@@ -95,6 +107,7 @@ final class UserDefaultsSessionStorage: SessionStorage {
         self.userKey = userKey
     }
 
+    /// 从 token 存储和 UserDefaults 组合还原完整会话。
     func loadSession() -> StoredSession? {
         guard let token = loadToken(),
               let userData = userDefaults.data(forKey: userKey),
@@ -104,6 +117,7 @@ final class UserDefaultsSessionStorage: SessionStorage {
         return StoredSession(token: token, user: user)
     }
 
+    /// 将 token 写入安全存储，将用户模型写入 UserDefaults。
     func saveSession(token: String, user: User) {
         tokenStorage.saveToken(token)
         userDefaults.removeObject(forKey: tokenKey)
@@ -112,17 +126,20 @@ final class UserDefaultsSessionStorage: SessionStorage {
         }
     }
 
+    /// 更新当前用户模型的缓存副本。
     func updateUser(_ user: User) {
         guard let userData = try? JSONEncoder().encode(user) else { return }
         userDefaults.set(userData, forKey: userKey)
     }
 
+    /// 清理 token 与用户缓存，彻底退出登录态。
     func clearSession() {
         tokenStorage.clearToken()
         userDefaults.removeObject(forKey: tokenKey)
         userDefaults.removeObject(forKey: userKey)
     }
 
+    /// 优先从 Keychain 读 token；若发现旧版 token 在 UserDefaults，则自动迁移。
     private func loadToken() -> String? {
         if let token = tokenStorage.loadToken() {
             return token
@@ -142,19 +159,23 @@ final class UserDefaultsSessionStorage: SessionStorage {
 final class InMemorySessionStorage: SessionStorage {
     private var storedSession: StoredSession?
 
+    /// 从内存返回当前会话，常用于预览或测试。
     func loadSession() -> StoredSession? {
         storedSession
     }
 
+    /// 在内存中保存会话，不落盘。
     func saveSession(token: String, user: User) {
         storedSession = StoredSession(token: token, user: user)
     }
 
+    /// 仅替换内存中的用户对象，保持 token 不变。
     func updateUser(_ user: User) {
         guard let token = storedSession?.token else { return }
         storedSession = StoredSession(token: token, user: user)
     }
 
+    /// 清空内存会话。
     func clearSession() {
         storedSession = nil
     }

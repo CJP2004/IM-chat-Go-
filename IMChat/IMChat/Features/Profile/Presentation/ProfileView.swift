@@ -206,6 +206,7 @@ struct ProfileView: View {
 
 // 自定义按钮样式，确保移除 NavigationBar 默认的背景效果
 struct ToolbarButtonStyle: ButtonStyle {
+    /// 定义按钮按下态反馈（透明度与缩放），用于统一工具栏按钮交互手感。
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .opacity(configuration.isPressed ? 0.7 : 1.0)

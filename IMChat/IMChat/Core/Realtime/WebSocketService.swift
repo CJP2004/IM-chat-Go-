@@ -44,6 +44,7 @@ class WebSocketService: ObservableObject {
     private let maxReconnectDelay: TimeInterval = 20
     private let heartbeatInterval: TimeInterval = 20
 
+    /// 私有初始化，强制外部通过 `shared` 单例访问。
     private init() {}
     
     /// 连接 WebSocket
@@ -101,6 +102,7 @@ class WebSocketService: ObservableObject {
         }
     }
 
+    /// 创建并启动 socket 连接（支持首连与重连两种状态）。
     private func openSocket(for userId: Int, token: String, isReconnect: Bool) {
         guard let url = URL(string: Constants.wsURL) else {
             updateConnectionState(.disconnected)
@@ -124,12 +126,14 @@ class WebSocketService: ObservableObject {
         print("Starscream: Connecting to \(url.absoluteString)...")
     }
 
+    /// 安全释放现有 socket，避免重复 delegate 回调或脏连接。
     private func teardownSocket() {
         socket?.delegate = nil
         socket?.disconnect()
         socket = nil
     }
 
+    /// 统一更新连接状态，并同步维护 `isConnected` 给 UI 绑定使用。
     private func updateConnectionState(_ state: ConnectionState) {
         DispatchQueue.main.async {
             self.connectionState = state
@@ -137,6 +141,7 @@ class WebSocketService: ObservableObject {
         }
     }
 
+    /// 处理“断开类”事件：停止心跳并按策略决定是否重连。
     private func handleDisconnectLikeEvent() {
         stopHeartbeat()
         guard shouldAutoReconnect, let userId = activeUserId else {
@@ -146,6 +151,7 @@ class WebSocketService: ObservableObject {
         scheduleReconnectIfNeeded(for: userId)
     }
 
+    /// 根据指数退避策略安排下一次重连任务。
     private func scheduleReconnectIfNeeded(for userId: Int) {
         guard shouldAutoReconnect else { return }
         guard reconnectWorkItem == nil else { return }
@@ -168,11 +174,13 @@ class WebSocketService: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
     }
 
+    /// 取消尚未执行的重连任务。
     private func cancelReconnect() {
         reconnectWorkItem?.cancel()
         reconnectWorkItem = nil
     }
 
+    /// 启动周期性 ping 心跳，帮助服务端保持连接活跃并尽快感知断线。
     private func startHeartbeat() {
         stopHeartbeat()
         heartbeatTimer = Timer.scheduledTimer(withTimeInterval: heartbeatInterval, repeats: true) { [weak self] _ in
@@ -185,11 +193,13 @@ class WebSocketService: ObservableObject {
         RunLoop.main.add(heartbeatTimer!, forMode: .common)
     }
 
+    /// 停止并销毁心跳定时器。
     private func stopHeartbeat() {
         heartbeatTimer?.invalidate()
         heartbeatTimer = nil
     }
 
+    /// 连接恢复后批量发送离线期间暂存的消息队列。
     private func flushOutboundQueue() {
         guard !outboundQueue.isEmpty else { return }
         let pending = outboundQueue
@@ -197,6 +207,7 @@ class WebSocketService: ObservableObject {
         pending.forEach { writeMessage($0) }
     }
 
+    /// 将消息编码为 JSON 文本并写入当前 socket。
     private func writeMessage(_ message: WSMessageDTO) {
         guard let data = try? JSONEncoder().encode(message),
               let jsonString = String(data: data, encoding: .utf8) else {
@@ -208,6 +219,7 @@ class WebSocketService: ObservableObject {
 
 // MARK: - WebSocketDelegate
 extension WebSocketService: WebSocketDelegate {
+    /// 统一接收 Starscream 事件并分发到连接状态/消息处理逻辑。
     func didReceive(event: WebSocketEvent, client: WebSocketClient) {
         switch event {
         case .connected(let headers):

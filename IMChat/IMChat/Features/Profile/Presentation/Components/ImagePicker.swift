@@ -14,6 +14,7 @@ struct ImagePicker: UIViewControllerRepresentable {
     let onImagePicked: (UIImage) -> Void
     let onCancel: () -> Void
 
+    /// 创建并配置系统图片选择控制器。
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let picker = UIImagePickerController()
         picker.sourceType = sourceType
@@ -22,8 +23,10 @@ struct ImagePicker: UIViewControllerRepresentable {
         return picker
     }
 
+    /// SwiftUI 更新 UIKit 控制器时的回调；当前组件无需动态更新。
     func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
 
+    /// 创建桥接代理 Coordinator，用于接收选择器回调事件。
     func makeCoordinator() -> Coordinator {
         Coordinator(onImagePicked: onImagePicked, onCancel: onCancel)
     }
@@ -32,15 +35,18 @@ struct ImagePicker: UIViewControllerRepresentable {
         private let onImagePicked: (UIImage) -> Void
         private let onCancel: () -> Void
 
+        /// 注入“选择完成/取消”两个回调闭包。
         init(onImagePicked: @escaping (UIImage) -> Void, onCancel: @escaping () -> Void) {
             self.onImagePicked = onImagePicked
             self.onCancel = onCancel
         }
 
+        /// 用户取消选择时回调给上层页面关闭弹窗。
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
             onCancel()
         }
 
+        /// 用户完成选择时优先返回裁剪图，否则返回原图；都取不到则按取消处理。
         func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
             if let edited = info[.editedImage] as? UIImage {
                 onImagePicked(edited)

@@ -32,6 +32,7 @@ struct WSMessageDTO: Codable, Equatable {
         case id = "ID"
     }
 
+    /// 创建一条待发送或已接收的 WS 消息模型。
     init(
         senderId: Int,
         receiverId: Int,
@@ -50,6 +51,7 @@ struct WSMessageDTO: Codable, Equatable {
         self.messageId = messageId
     }
 
+    /// 自定义解码：优先读新字段 `messageId`，兼容旧字段 `ID`。
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         senderId = try container.decode(Int.self, forKey: .senderId)
@@ -83,6 +85,7 @@ struct WSMessageDTO: Codable, Equatable {
         ].joined(separator: "|")
     }
 
+    /// 把 WS DTO 统一映射到聊天领域模型，生成可用于 UI 去重和渲染的稳定 ID。
     func toDomain(stableId: String? = nil, createdAt: String? = nil) -> ChatMessage {
         let resolvedStableId: String
         if let stableId {

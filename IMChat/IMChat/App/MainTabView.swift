@@ -19,6 +19,7 @@ struct MainTabView: View {
     @EnvironmentObject private var container: AppContainer
     @State private var selectedTab: Tab = .message
     
+    /// 初始化并统一设置全局 TabBar 外观（透明背景、金色选中态）。
     init() {
             // 1. 初始化外观配置
             let appearance = UITabBarAppearance()

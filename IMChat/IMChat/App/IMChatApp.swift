@@ -15,6 +15,7 @@ struct IMChatApp: App {
     // 创建全局唯一的 AuthViewModel
     @StateObject private var authViewModel: AuthViewModel
 
+    /// 应用启动时装配容器与全局认证状态对象。
     init() {
         let container = AppContainer()
         _container = StateObject(wrappedValue: container)
