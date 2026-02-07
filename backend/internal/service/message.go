@@ -31,9 +31,9 @@ func (s *MessageService) SaveMessage(senderID, receiverID uint, content, msgType
 }
 
 // GetHistory 获取两个用户之间的历史消息
-// 按时间正序返回
-func (s *MessageService) GetHistory(user1ID, user2ID uint) ([]models.Message, error) {
-	return models.GetMessages(user1ID, user2ID)
+// 以“最新页优先”分页，返回结果按时间正序（便于前端直接渲染）
+func (s *MessageService) GetHistory(user1ID, user2ID uint, page, pageSize int) ([]models.Message, error) {
+	return models.GetMessagesPage(user1ID, user2ID, page, pageSize)
 }
 
 // GetLastMessage 获取两个用户之间最近的一条消息

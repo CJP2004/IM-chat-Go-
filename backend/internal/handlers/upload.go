@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"im-chat/pkg/response"
 	"im-chat/pkg/utils"
 	"net/http"
 
@@ -12,7 +13,7 @@ func Upload(c *gin.Context) {
 	// 1. 获取上传的文件
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "File is required"})
+		response.Error(c, http.StatusBadRequest, "File is required")
 		return
 	}
 	defer file.Close()
@@ -20,7 +21,7 @@ func Upload(c *gin.Context) {
 	// 2. 上传到 COS
 	url, err := utils.UploadFile(file, header)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload file"})
+		response.Error(c, http.StatusInternalServerError, "Failed to upload file")
 		return
 	}
 

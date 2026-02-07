@@ -2,6 +2,7 @@ package router
 
 import (
 	"im-chat/internal/handlers"
+	"im-chat/internal/middleware"
 	"im-chat/internal/ws"
 	"net/http"
 
@@ -21,16 +22,20 @@ func SetupRouter(hub *ws.Hub) *gin.Engine {
 	{
 		api.POST("/register", handlers.Register) //用户注册
 		api.POST("/login", handlers.Login)       //用户登录
-		api.GET("/users", handlers.ListUsers)    //获取用户列表
 
-		api.POST("/upload", handlers.Upload)             // 上传文件
-		api.GET("/messages", handlers.GetHistory)        // 获取历史消息
-		api.PUT("/user/avatar", handlers.UpdateAvatar)   // 更新头像
-		api.PUT("/user/tagline", handlers.UpdateTagline) // 更新签名
+		authorized := api.Group("")
+		authorized.Use(middleware.HTTPAuth())
+		{
+			authorized.GET("/users", handlers.ListUsers)            //获取用户列表
+			authorized.POST("/upload", handlers.Upload)             // 上传文件
+			authorized.GET("/messages", handlers.GetHistory)        // 获取历史消息
+			authorized.PUT("/user/avatar", handlers.UpdateAvatar)   // 更新头像
+			authorized.PUT("/user/tagline", handlers.UpdateTagline) // 更新签名
+		}
 	}
 
 	// WebSocket 路由
-	r.GET("/ws", func(c *gin.Context) {
+	r.GET("/ws", middleware.HTTPAuth(), func(c *gin.Context) {
 		ws.ServeWs(hub, c)
 	})
 

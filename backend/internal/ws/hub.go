@@ -3,6 +3,7 @@ package ws
 import (
 	"encoding/json"
 	"im-chat/internal/service"
+	"log"
 )
 
 // messageService 消息服务实例
@@ -79,25 +80,28 @@ func (h *Hub) Run() {
 				// 所以是标记：Sender_id = Receiver(B), Receiver_id = Sender(A) 的消息为已读
 				err := messageService.MarkMessagesRead(msg.ReceiverID, msg.SenderID)
 				if err != nil {
-					return
+					log.Printf("mark read failed: sender=%d receiver=%d err=%v", msg.ReceiverID, msg.SenderID, err)
+					continue
 				}
+
+				// 已读回执仅通知被回执的一方
+				h.pushToUser(msg.ReceiverID, msg)
+				continue
 			} else {
 				// 2. 如果是普通消息，持久化到数据库
-				messageService.SaveMessage(msg.SenderID, msg.ReceiverID, msg.Content, msg.Type, msg.MediaURL)
+				saved, err := messageService.SaveMessage(msg.SenderID, msg.ReceiverID, msg.Content, msg.Type, msg.MediaURL)
+				if err != nil {
+					log.Printf("save message failed: sender=%d receiver=%d err=%v", msg.SenderID, msg.ReceiverID, err)
+					continue
+				}
+				msg.MessageID = saved.ID
 			}
 
-			// 根据消息中的 ReceiverID 找到目标客户端
-			if client, ok := h.UserClients[msg.ReceiverID]; ok {
-				// 将结构体序列化回 JSON 字节
-				bytes, _ := json.Marshal(msg)
-				select {
-				case client.Send <- bytes: // 发送给目标客户端
-				default:
-					// 如果发送失败 (缓冲区满/断开)，则关闭连接
-					close(client.Send)
-					delete(h.Clients, client)
-					delete(h.UserClients, client.ID)
-				}
+			// 将消息转发给接收方
+			h.pushToUser(msg.ReceiverID, msg)
+			// 同时回执给发送方（用于前端用 clientMessageId / messageId 确认乐观消息）
+			if msg.SenderID != msg.ReceiverID {
+				h.pushToUser(msg.SenderID, msg)
 			}
 		case message := <-h.Broadcast:
 			// 4. 处理广播消息 (给所有人)
@@ -110,5 +114,26 @@ func (h *Hub) Run() {
 				}
 			}
 		}
+	}
+}
+
+func (h *Hub) pushToUser(userID uint, msg *WsMessage) {
+	client, ok := h.UserClients[userID]
+	if !ok {
+		return
+	}
+
+	bytes, err := json.Marshal(msg)
+	if err != nil {
+		log.Printf("marshal ws message failed: user=%d err=%v", userID, err)
+		return
+	}
+
+	select {
+	case client.Send <- bytes:
+	default:
+		close(client.Send)
+		delete(h.Clients, client)
+		delete(h.UserClients, client.ID)
 	}
 }

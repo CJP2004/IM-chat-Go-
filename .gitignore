@@ -1,6 +1,9 @@
 # Backend
 backend/im-chat
 backend/config.yaml
+backend/.env
+backend/.env.*
+!backend/.env.example
 backend/uploads/
 # Frontend
 frontend/node_modules/

@@ -1,11 +1,11 @@
 package handlers
 
 import (
+	"im-chat/internal/middleware"
 	"im-chat/internal/models"
 	"im-chat/internal/service"
 	"im-chat/pkg/response"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -15,15 +15,12 @@ var msgService = new(service.MessageService)
 
 // ListUsers 获取用户列表接口
 // 返回除当前用户外的所有用户（类似于通讯录）
-// GET /api/users?userId=1
+// GET /api/users
 func ListUsers(c *gin.Context) {
-	// 获取当前用户ID
-	currentUserIDStr := c.Query("userId")
-	var currentUserID uint
-	if currentUserIDStr != "" {
-		if id, err := strconv.Atoi(currentUserIDStr); err == nil {
-			currentUserID = uint(id)
-		}
+	currentUserID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		response.ErrorWithCode(c, http.StatusUnauthorized, response.CodeUnauthorized, "unauthorized")
+		return
 	}
 
 	var users []models.User
@@ -46,16 +43,14 @@ func ListUsers(c *gin.Context) {
 		lastMsgTime := ""
 
 		// 获取与该用户的最近一条消息
-		if currentUserID != 0 {
-			msg, err := msgService.GetLastMessage(currentUserID, u.ID)
-			if err == nil && msg.ID != 0 {
-				if msg.Type == "image" {
-					lastMsgContent = "[图片]"
-				} else {
-					lastMsgContent = msg.Content
-				}
-				lastMsgTime = msg.CreatedAt.Format("2006-01-02 15:04:05")
+		msg, err := msgService.GetLastMessage(currentUserID, u.ID)
+		if err == nil && msg.ID != 0 {
+			if msg.Type == "image" {
+				lastMsgContent = "[图片]"
+			} else {
+				lastMsgContent = msg.Content
 			}
+			lastMsgTime = msg.CreatedAt.Format("2006-01-02 15:04:05")
 		}
 
 		result = append(result, gin.H{

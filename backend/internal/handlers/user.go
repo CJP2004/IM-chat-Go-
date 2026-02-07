@@ -1,13 +1,16 @@
 package handlers
 
 import (
+	"im-chat/internal/middleware"
 	"im-chat/internal/models" // Import models
 	"im-chat/internal/service"
 	"im-chat/pkg/response" // Import response package
 	"im-chat/pkg/utils"    // Import utils for device parsing
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // userService 实例
@@ -28,6 +31,10 @@ func Register(c *gin.Context) {
 	// 调用 Service 层注册
 	err := userService.Register(input.Username, input.Password)
 	if err != nil {
+		if strings.Contains(err.Error(), "already exists") {
+			response.ErrorWithCode(c, http.StatusConflict, response.CodeConflict, err.Error())
+			return
+		}
 		response.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -39,11 +46,11 @@ func Register(c *gin.Context) {
 		return
 	}
 
-    // 解析设备信息并更新 Tagline
+	// 解析设备信息并更新 Tagline
 	uaString := c.GetHeader("User-Agent")
 	deviceName := utils.ParseDevice(uaString)
 	user.Tagline = deviceName
-	models.DB.Save(&user)
+	models.DB.Save(user)
 
 	response.Success(c, gin.H{
 		"token": token,
@@ -79,7 +86,7 @@ func Login(c *gin.Context) {
 	uaString := c.GetHeader("User-Agent")
 	deviceName := utils.ParseDevice(uaString)
 	user.Tagline = deviceName
-	models.DB.Save(&user)
+	models.DB.Save(user)
 
 	response.Success(c, gin.H{
 		"token": token,
@@ -94,8 +101,12 @@ func Login(c *gin.Context) {
 
 // UpdateAvatar 更新头像
 func UpdateAvatar(c *gin.Context) {
-	// 简单实现：从 Query 获取 UserID (实际应该从 Token 获取)
-	userIDStr := c.Query("userId")
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		response.ErrorWithCode(c, http.StatusUnauthorized, response.CodeUnauthorized, "unauthorized")
+		return
+	}
+
 	var input struct {
 		Avatar string `json:"avatar" binding:"required"`
 	}
@@ -105,21 +116,18 @@ func UpdateAvatar(c *gin.Context) {
 		return
 	}
 
-	if userIDStr == "" {
-		response.Error(c, http.StatusBadRequest, "User ID is required")
-		return
-	}
-
-	// 这里直接调用 Model 层，实际项目建议走 Service 层
-	// 为了简化流程，暂不修改 Service 接口
-	var user models.User
-	if err := models.DB.First(&user, userIDStr).Error; err != nil {
-		response.Error(c, http.StatusNotFound, "User not found")
+	user, err := models.FindUserByID(userID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			response.Error(c, http.StatusNotFound, "User not found")
+			return
+		}
+		response.Error(c, http.StatusInternalServerError, "Failed to load user")
 		return
 	}
 
 	user.Avatar = input.Avatar
-	if err := models.UpdateUser(&user); err != nil {
+	if err := models.UpdateUser(user); err != nil {
 		response.Error(c, http.StatusInternalServerError, "Failed to update avatar")
 		return
 	}
@@ -129,7 +137,12 @@ func UpdateAvatar(c *gin.Context) {
 
 // UpdateTagline 更新个性签名
 func UpdateTagline(c *gin.Context) {
-	userIDStr := c.Query("userId")
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		response.ErrorWithCode(c, http.StatusUnauthorized, response.CodeUnauthorized, "unauthorized")
+		return
+	}
+
 	var input struct {
 		Tagline string `json:"tagline"`
 	}
@@ -139,19 +152,18 @@ func UpdateTagline(c *gin.Context) {
 		return
 	}
 
-	if userIDStr == "" {
-		response.Error(c, http.StatusBadRequest, "User ID is required")
-		return
-	}
-
-	var user models.User
-	if err := models.DB.First(&user, userIDStr).Error; err != nil {
-		response.Error(c, http.StatusNotFound, "User not found")
+	user, err := models.FindUserByID(userID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			response.Error(c, http.StatusNotFound, "User not found")
+			return
+		}
+		response.Error(c, http.StatusInternalServerError, "Failed to load user")
 		return
 	}
 
 	user.Tagline = input.Tagline
-	if err := models.UpdateUser(&user); err != nil {
+	if err := models.UpdateUser(user); err != nil {
 		response.Error(c, http.StatusInternalServerError, "Failed to update tagline")
 		return
 	}
