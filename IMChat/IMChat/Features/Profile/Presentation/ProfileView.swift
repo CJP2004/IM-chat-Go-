@@ -148,7 +148,7 @@ struct ProfileView: View {
                         StatCard(title: "Days", value: "365")
                     }
                     .padding(.horizontal, 0)
-                    .frame(maxWidth: 420)
+                    .frame(maxWidth: 380)
 
                     
                     Spacer()

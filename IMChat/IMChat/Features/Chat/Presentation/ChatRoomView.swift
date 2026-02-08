@@ -28,6 +28,13 @@ struct ChatRoomView: View {
         GeometryReader { proxy in
             let topInset = proxy.safeAreaInsets.top
             let bubbleMaxWidth = proxy.size.width * 0.7
+            // 动态顶部留白：
+            // - 少量消息：保留更大留白，避免内容被悬浮头部遮挡
+            // - 消息较多：收紧留白，去掉顶部大片黑边
+            let compactTopPadding = topInset + 8
+            let expandedTopPadding = topInset + 120
+            let shouldUseExpandedTopPadding = viewModel.messages.count <= 8
+            let messageTopPadding = shouldUseExpandedTopPadding ? expandedTopPadding : compactTopPadding
 
             ZStack(alignment: .top) {
                 VStack(spacing: 0) {
@@ -57,7 +64,7 @@ struct ChatRoomView: View {
                             }
                             .padding()
                         }
-                        .padding(.top, topInset + 8)
+                        .padding(.top, messageTopPadding)
                         .onAppear {
                             scrollToBottom(using: scrollProxy, animated: false)
                         }
