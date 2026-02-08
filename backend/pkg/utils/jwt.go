@@ -7,9 +7,22 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// SecretKey JWT 签名密钥
-// 在生产环境中，这应该从配置文件或环境变量中读取，不能硬编码
-var SecretKey = []byte("your-secret-key") 
+// secretKey JWT 签名密钥
+var secretKey = []byte("change-me-in-config")
+
+// tokenTTL JWT 过期时长
+var tokenTTL = 24 * time.Hour
+
+// ConfigureJWT 配置 JWT 参数（启动时调用）
+func ConfigureJWT(secret string, expireHours int) {
+	if secret != "" {
+		secretKey = []byte(secret)
+	}
+
+	if expireHours > 0 {
+		tokenTTL = time.Duration(expireHours) * time.Hour
+	}
+}
 
 // Claims 自定义 JWT 载荷结构体
 // 继承了 standard claims (exp, iat 等) 并添加了 UserID
@@ -25,23 +38,23 @@ func GenerateToken(userID uint) (string, error) {
 	claims := &Claims{
 		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
-			// 设置过期时间为 24 小时
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			// 设置过期时间
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(tokenTTL)),
 			// 设置签发时间
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			IssuedAt: jwt.NewNumericDate(time.Now()),
 		},
 	}
 
 	// 使用 HS256 算法进行签名
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(SecretKey)
+	return token.SignedString(secretKey)
 }
 
 // ParseToken 解析并验证 JWT Token
 func ParseToken(tokenString string) (*Claims, error) {
 	// ParseWithClaims 会自动验证签名和过期时间
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-		return SecretKey, nil
+		return secretKey, nil
 	})
 
 	if err != nil {

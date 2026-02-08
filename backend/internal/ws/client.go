@@ -1,13 +1,13 @@
 package ws
 
 import (
-	"log"
-	"net/http"
 	"encoding/json"
-	"strconv"
-	"time"
+	"im-chat/internal/middleware"
 	"im-chat/internal/models"
 	"im-chat/pkg/utils"
+	"log"
+	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -34,7 +34,7 @@ var upgrader = websocket.Upgrader{
 type Client struct {
 	Hub *Hub
 	ID  uint // 关联的用户 ID
-	
+
 	// The websocket connection.
 	Conn *websocket.Conn
 
@@ -56,7 +56,7 @@ func (c *Client) ReadPump() {
 	c.Conn.SetReadDeadline(time.Now().Add(pongWait))
 	// 设置心跳响应 (Pong) 处理器
 	c.Conn.SetPongHandler(func(string) error { c.Conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
-	
+
 	for {
 		// 阻塞读取 WebSocket 消息
 		_, message, err := c.Conn.ReadMessage()
@@ -66,21 +66,23 @@ func (c *Client) ReadPump() {
 			}
 			break
 		}
-		
+
 		// 解析前端发来的 JSON 消息
 		var wsMsg WsMessage
 		if err := json.Unmarshal(message, &wsMsg); err != nil {
 			log.Printf("error unmarshal: %v", err)
 			continue
 		}
-		
+
 		wsMsg.SenderID = c.ID // 强制标记发送者为当前用户，防止伪造
 
 		// 根据是否有 ReceiverID 决定是私聊还是广播
 		if wsMsg.ReceiverID != 0 {
 			c.Hub.Direct <- &wsMsg
 		} else {
-			c.Hub.Broadcast <- message
+			if payload, err := json.Marshal(wsMsg); err == nil {
+				c.Hub.Broadcast <- payload
+			}
 		}
 	}
 }
@@ -131,24 +133,20 @@ func (c *Client) WritePump() {
 
 // ServeWs 处理 WebSocket 请求入口
 func ServeWs(hub *Hub, c *gin.Context) {
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "unauthorized"})
+		return
+	}
+
 	// 1. 将 HTTP 请求升级为 WebSocket 协议
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	
-	// 2. 从 Query 参数获取当前用户 ID (后续应从 JWT Token 获取)
-	userIDStr := c.Query("userId")
-	var userID uint
-	if userIDStr != "" {
-		id, err := strconv.ParseUint(userIDStr, 10, 32)
-		if err == nil {
-			userID = uint(id)
-		}
-	}
 
-	// 3. 解析设备信息并更新 Tagline
+	// 2. 解析设备信息并更新 Tagline
 	uaString := c.GetHeader("User-Agent")
 	deviceName := utils.ParseDevice(uaString)
 	if userID != 0 {
@@ -158,14 +156,14 @@ func ServeWs(hub *Hub, c *gin.Context) {
 			models.DB.Save(&user)
 		}
 	}
-	
-	// 4. 创建 Client 对象
+
+	// 3. 创建 Client 对象
 	client := &Client{Hub: hub, ID: userID, Conn: conn, Send: make(chan []byte, 256)}
-	
-	// 5. 注册到 Hub
+
+	// 4. 注册到 Hub
 	client.Hub.Register <- client
 
-	// 6. 启动读写协程
+	// 5. 启动读写协程
 	// Go 关键字：异步启动 Goroutines
 	go client.WritePump()
 	go client.ReadPump()
