@@ -1,0 +1,20 @@
+server:
+  port: "2222"
+
+mysql:
+  dsn: "root:your_password@tcp(127.0.0.1:3306)/IMChat?charset=utf8mb4&parseTime=True&loc=Local"
+
+redis:
+  addr: "127.0.0.1:6379"
+  password: ""
+  db: 0
+
+cos:
+  secret_id: "your_cos_secret_id"
+  secret_key: "your_cos_secret_key"
+  bucket: "your_bucket_name"
+  region: "ap-shanghai"
+
+jwt:
+  secret: "replace_with_a_strong_random_secret"
+  expire_hours: 24
